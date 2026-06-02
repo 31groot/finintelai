@@ -1,0 +1,6 @@
+.env
+.venv/
+data/chromadb/
+__pycache__/
+
+src/app/test_gemini.py.env
