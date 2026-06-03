@@ -162,3 +162,8 @@ python-dotenv
 groq
 chromadb
 sentence-transformers
+pdfplumber
+camelot-py
+rank-bm25↓
+camelot-py
+table_parser.py
