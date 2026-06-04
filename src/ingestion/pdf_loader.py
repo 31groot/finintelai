@@ -1,33 +1,31 @@
-import fitz  # pymupdf
+import fitz
 
 
 def load_pdf(pdf_path: str) -> str:
-    """
-    Extract text from a PDF using PyMuPDF.
-    Returns the complete text as a string.
-    """
 
     text = ""
 
     with fitz.open(pdf_path) as doc:
+
         for page in doc:
             text += page.get_text()
 
     return text
 
 
-if __name__ == "__main__":
+def load_pdf_pages(pdf_path):
 
-    pdf_path = "data/raw/infosys_fy24.pdf"
+    pages = []
 
-    text = load_pdf(pdf_path)
+    with fitz.open(pdf_path) as doc:
 
-    print("=" * 60)
-    print("PDF LOADED SUCCESSFULLY")
-    print("=" * 60)
+        for page_num, page in enumerate(doc, start=1):
 
-    print(f"\nTotal Characters: {len(text)}")
+            pages.append(
+                {
+                    "page": page_num,
+                    "text": page.get_text()
+                }
+            )
 
-    print("\nFIRST 2000 CHARACTERS:\n")
-
-    print(text[:2000])
+    return pages
