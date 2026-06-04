@@ -1,20 +1,24 @@
 from dotenv import load_dotenv
-import os
 from groq import Groq
+
 from src.features.rag import RAGPipeline
 
 load_dotenv()
 
+
 class QAChain:
+
     def __init__(self):
+
         self.rag = RAGPipeline()
         self.client = Groq()
 
     def ask(self, query):
+
         result = self.rag.get_context(query)
 
         context = result["context"]
-    
+        sources = result["metadata"]
 
         prompt = f"""
 You are a financial analyst.
@@ -42,5 +46,30 @@ Answer:
         )
 
         answer = response.choices[0].message.content
-        return answer
-        
+
+        # =========================
+        # SOURCE ATTRIBUTION
+        # =========================
+
+        citations = "\n\nSources:\n"
+
+        seen = set()
+
+        for item in sources:
+
+            source = item.get("source")
+
+            page = item.get("page")
+
+            key = (source, page)
+
+            if key not in seen:
+
+                citations += (
+                    f"- {source} "
+                    f"(page {page})\n"
+                )
+
+                seen.add(key)
+
+        return answer + citations
