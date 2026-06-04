@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from src.ingestion.pdf_loader import load_pdf
 from src.ingestion.chunker import chunk_text
 
@@ -10,75 +12,102 @@ from src.retrieval.vector_store import VectorStore
 
 def main():
 
-    pdf_path = "data/raw/infosys_fy24.pdf"
-
-    print("Loading PDF...")
-    text = load_pdf(pdf_path)
-
-    print(f"Characters: {len(text)}")
-
-    # ----------------------------
-    # TEXT CHUNKS
-    # ----------------------------
-
-    print("\nChunking text...")
-    chunks = chunk_text(text)
-
-    print(f"Text chunks: {len(chunks)}")
-
-    # ----------------------------
-    # TABLE CHUNKS
-    # ----------------------------
-
-    print("\nExtracting tables...")
-
-    tables = extract_tables(pdf_path)
-
-    print(f"Tables found: {len(tables)}")
-
-    table_chunks, table_metadata = chunk_tables(
-        tables,
-        "infosys_fy24"
+    pdf_files = list(
+        Path("data/raw").glob("*.pdf")
     )
 
-    print(f"Table chunks: {len(table_chunks)}")
+    if not pdf_files:
+        print("No PDFs found.")
+        return
 
-    # ----------------------------
-    # MERGE
-    # ----------------------------
+    all_chunks = []
+    all_metadata = []
 
-    text_metadata = [
-        {
-            "source": "infosys_fy24",
-            "chunk_type": "text"
-        }
-        for _ in chunks
-    ]
+    # ==========================================
+    # PROCESS ALL PDFS
+    # ==========================================
 
-    all_chunks = chunks + table_chunks
-    all_metadata = text_metadata + table_metadata
+    for pdf_path in pdf_files:
 
-    print(f"\nTotal chunks: {len(all_chunks)}")
+        source_name = pdf_path.stem
 
-    # ----------------------------
-    # EMBEDDINGS
-    # ----------------------------
+        print("\n" + "=" * 60)
+        print(f"Processing: {source_name}")
+        print("=" * 60)
 
-    print("\nEmbedding...")
+
+        print("Loading PDF...")
+
+        text = load_pdf(str(pdf_path))
+
+        print(f"Characters: {len(text)}")
+
+
+        print("\nChunking text...")
+
+        text_chunks = chunk_text(text)
+
+        print(f"Text chunks: {len(text_chunks)}")
+
+        text_metadata = [
+            {
+                "source": source_name,
+                "chunk_type": "text"
+            }
+            for _ in text_chunks
+        ]
+
+
+        print("\nExtracting tables...")
+
+        tables = extract_tables(
+            str(pdf_path)
+        )
+
+        print(f"Tables found: {len(tables)}")
+
+        table_chunks, table_metadata = chunk_tables(
+            tables,
+            source_name
+        )
+
+        print(
+            f"Table chunks: {len(table_chunks)}"
+        )
+
+
+
+        all_chunks.extend(text_chunks)
+        all_chunks.extend(table_chunks)
+
+        all_metadata.extend(text_metadata)
+        all_metadata.extend(table_metadata)
+
+        print(
+            f"Running total chunks: {len(all_chunks)}"
+        )
+
+    print("\n" + "=" * 60)
+    print("Embedding all chunks...")
+    print("=" * 60)
 
     embedder = EmbeddingModel()
 
-    embeddings = embedder.embed(all_chunks)
+    embeddings = embedder.embed(
+        all_chunks
+    )
 
-    print(f"Embeddings shape: {embeddings.shape}")
+    print(
+        f"Embeddings shape: {embeddings.shape}"
+    )
 
-    # ----------------------------
-    # STORE
-    # ----------------------------
 
     print("\nSaving to ChromaDB...")
 
     store = VectorStore()
+
+   
+    store.reset()
 
     store.add_documents(
         all_chunks,
@@ -86,7 +115,9 @@ def main():
         all_metadata
     )
 
-    print(f"Total documents in DB: {store.count()}")
+    print(
+        f"Total documents in DB: {store.count()}"
+    )
 
 
 if __name__ == "__main__":

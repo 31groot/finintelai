@@ -19,5 +19,17 @@ class Retriever:
             include=["documents", "metadatas", "distances"]
         )
 
+        print("\n========== DEBUG ==========")
+        print("Collection count:", self.store.count())
+
+        if results["documents"]:
+            print(
+                "Retrieved docs:",
+                len(results["documents"][0])
+            )
+        else:
+            print("Retrieved docs: 0")
+
+        print("===========================\n")
+
         return results
-    
