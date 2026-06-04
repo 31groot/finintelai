@@ -24,7 +24,6 @@ class Reranker:
             reverse=True
         )
 
-        return [
-            doc
-            for doc, _ in ranked[:top_k]
-        ]
+        return ranked[:top_k]
+    
+    

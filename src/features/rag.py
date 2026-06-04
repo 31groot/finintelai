@@ -1,15 +1,9 @@
 from src.retrieval.retriever import Retriever
-from src.retrieval.reranker import Reranker
-
-
 class RAGPipeline:
 
     def __init__(self):
 
         self.retriever = Retriever()
-
-        # will add reranker
-        # self.reranker = Reranker()
 
     def get_context(self, query):
 
@@ -17,13 +11,47 @@ class RAGPipeline:
             query,
             n_results=8
         )
+        # ---------------------
+        # VECTOR RESULTS
+        # ---------------------
 
-        docs = results["documents"][0]
-        metadata = results["metadatas"][0]
+        vector_docs = (
+            results["vector_results"]
+            ["documents"][0]
+        )
 
-        context = "\n\n".join(docs[:5])
+        vector_metadata = (
+            results["vector_results"]
+            ["metadatas"][0]
+        )
+
+        # ---------------------
+        # BM25 RESULTS
+        # ---------------------
+
+        bm25_docs = (
+            results["bm25_results"]
+        )
+
+        # ---------------------
+        # MERGE
+        # ---------------------
+
+        combined_docs = list(
+            dict.fromkeys(
+                vector_docs + bm25_docs
+            )
+        )
+
+        # ---------------------
+        # CONTEXT
+        # ---------------------
+
+        context = "\n\n".join(
+            combined_docs[:5]
+        )
 
         return {
             "context": context,
-            "metadata": metadata
+            "metadata": vector_metadata
         }

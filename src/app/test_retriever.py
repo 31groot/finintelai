@@ -2,7 +2,7 @@ from src.retrieval.retriever import Retriever
 
 retriever = Retriever()
 
-query = "Infosys revenue FY24"
+query = "Mazagon Dock order book"
 
 results = retriever.search(
     query,
@@ -12,19 +12,36 @@ results = retriever.search(
 print("\nQUESTION:")
 print(query)
 
-print("\nTOP RESULTS:\n")
+print("\n" + "=" * 60)
+print("VECTOR RESULTS")
+print("=" * 60)
 
-for i, doc in enumerate(
-    results["documents"][0],
+vector_docs = results["vector_results"]["documents"][0]
+vector_meta = results["vector_results"]["metadatas"][0]
+
+for i, (doc, meta) in enumerate(
+    zip(vector_docs, vector_meta),
     start=1
 ):
-    print("=" * 60)
-    print(f"RESULT {i}")
-    print("=" * 60)
 
-    print(doc[:1000])
+    print(f"\nRESULT {i}")
+    print("-" * 40)
+
+    print(doc[:500])
 
     print("\nMETADATA:")
-    print(results["metadatas"][0][i - 1])
+    print(meta)
 
-    print()
+print("\n" + "=" * 60)
+print("BM25 RESULTS")
+print("=" * 60)
+
+for i, doc in enumerate(
+    results["bm25_results"],
+    start=1
+):
+
+    print(f"\nRESULT {i}")
+    print("-" * 40)
+
+    print(doc[:500])
