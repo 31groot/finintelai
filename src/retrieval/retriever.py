@@ -1,5 +1,6 @@
 from src.retrieval.embeddings import EmbeddingModel
 from src.retrieval.vector_store import VectorStore
+from src.retrieval.bm25 import BM25Retriever
 
 
 class Retriever:
@@ -7,29 +8,63 @@ class Retriever:
     def __init__(self):
 
         self.embedder = EmbeddingModel()
+
         self.store = VectorStore()
 
-    def search(self, query: str, n_results: int = 8):
-
-        query_embedding = self.embedder.embed([query])
-
-        results = self.store.collection.query(
-            query_embeddings=query_embedding.tolist(),
-            n_results=n_results,
-            include=["documents", "metadatas", "distances"]
+        all_data = (
+            self.store.get_all_documents()
         )
 
-        print("\n========== DEBUG ==========")
-        print("Collection count:", self.store.count())
+        self.documents = (
+            all_data["documents"]
+        )
 
-        if results["documents"]:
-            print(
-                "Retrieved docs:",
-                len(results["documents"][0])
+        self.metadata = (
+            all_data["metadatas"]
+        )
+
+        self.bm25 = BM25Retriever(
+            self.documents
+        )
+
+    def search(
+        self,
+        query,
+        n_results=8
+    ):
+
+        # VECTOR SEARCH
+
+        query_embedding = (
+            self.embedder.embed([query])
+        )
+
+        vector_results = (
+            self.store.collection.query(
+                query_embeddings=
+                query_embedding.tolist(),
+                n_results=n_results,
+                include=[
+                    "documents",
+                    "metadatas",
+                    "distances"
+                ]
             )
-        else:
-            print("Retrieved docs: 0")
+        )
 
-        print("===========================\n")
+        # BM25 SEARCH
 
-        return results
+        bm25_docs = (
+            self.bm25.search(
+                query,
+                top_k=n_results
+            )
+        )
+
+        return {
+            "vector_results":
+            vector_results,
+
+            "bm25_results":
+            bm25_docs
+        }

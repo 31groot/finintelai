@@ -66,7 +66,7 @@ class VectorStore:
             )
 
             print(
-                f"Stored batch: {start} -> {end}"
+                f"Stored batch: {start} -> {min(end, len(chunks))}"
             )
 
         print(
@@ -74,4 +74,16 @@ class VectorStore:
         )
 
     def count(self):
+
         return self.collection.count()
+
+    def get_all_documents(self):
+
+        results = self.collection.get(
+            include=[
+                "documents",
+                "metadatas"
+            ]
+        )
+
+        return results
