@@ -1,5 +1,4 @@
 from sentence_transformers import CrossEncoder
-from sentence_transformers import CrossEncoder
 
 
 class Reranker:
@@ -9,7 +8,7 @@ class Reranker:
             "cross-encoder/ms-marco-MiniLM-L-6-v2"
         )
 
-    def rerank(self, query, documents, top_k=5):
+    def rerank(self, query, documents, top_k=10):
 
         pairs = [
             [query, doc]
@@ -24,6 +23,9 @@ class Reranker:
             reverse=True
         )
 
-        return ranked[:top_k]
+        return [
+    doc
+    for doc, _ in ranked[:top_k]
+]
     
     

@@ -30,7 +30,7 @@ class Retriever:
     def search(
         self,
         query,
-        n_results=8
+        n_results=15
     ):
 
         # VECTOR SEARCH

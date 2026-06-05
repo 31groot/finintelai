@@ -21,9 +21,58 @@ class QAChain:
         sources = result["metadata"]
 
         prompt = f"""
-You are a financial analyst.
+You are an expert financial analyst.
 
-Use ONLY the provided context.
+Use ONLY the information present in the provided context.
+
+Rules:
+
+1. Never use outside knowledge.
+
+2. If information is missing from the context, explicitly say so.
+
+3. If the question asks for:
+   - comparison
+   - ranking
+   - highest
+   - lowest
+   - best
+   - worst
+   - compare
+   - rank
+
+   then:
+
+   a. Extract all relevant company values from the context.
+
+   b. Combine information across multiple chunks.
+
+   c. Compare the values numerically.
+
+   d. Return a ranked list whenever possible.
+
+4. Do NOT say "only one company is mentioned"
+   unless there is truly only one company
+   in the provided context.
+
+5. If multiple companies appear in the context,
+   identify each company and its corresponding value
+   before answering.
+
+6. For revenue questions:
+
+   - Extract revenue figures for every company found.
+
+   - Rank companies from highest revenue to lowest revenue.
+
+7. Think step-by-step:
+
+   - Identify companies.
+   - Extract values.
+   - Compare values.
+   - Then answer.
+
+8. Show calculations and comparisons when relevant.
 
 Context:
 {context}
@@ -58,7 +107,6 @@ Answer:
         for item in sources:
 
             source = item.get("source")
-
             page = item.get("page")
 
             key = (source, page)
