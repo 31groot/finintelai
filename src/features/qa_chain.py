@@ -72,7 +72,8 @@ Rules:
    - Compare values.
    - Then answer.
 
-8. Show calculations and comparisons when relevant.
+Never estimate or infer missing financial values.
+Use only explicitly stated values from the context.
 
 Context:
 {context}

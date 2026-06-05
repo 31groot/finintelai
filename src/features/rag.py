@@ -11,14 +11,18 @@ class RAGPipeline:
 
     def get_context(self, query):
 
+        # ====================
+        # RETRIEVE
+        # ====================
+
         results = self.retriever.search(
             query,
-            n_results=20
+            n_results=50
         )
 
-        # --------------------
+        # ====================
         # VECTOR RESULTS
-        # --------------------
+        # ====================
 
         vector_docs = (
             results["vector_results"]["documents"][0]
@@ -28,17 +32,17 @@ class RAGPipeline:
             results["vector_results"]["metadatas"][0]
         )
 
-        # --------------------
+        # ====================
         # BM25 RESULTS
-        # --------------------
+        # ====================
 
         bm25_docs = (
             results["bm25_results"]
         )
 
-        # --------------------
-        # MERGE
-        # --------------------
+        # ====================
+        # MERGE + REMOVE DUPES
+        # ====================
 
         combined_docs = list(
             dict.fromkeys(
@@ -46,31 +50,46 @@ class RAGPipeline:
             )
         )
 
-        print("\n==============================")
-        print("TOTAL COMBINED DOCS")
-        print(len(combined_docs))
-        print("==============================")
+        # ====================
+        # DYNAMIC RERANK DEPTH
+        # ====================
 
-        # --------------------
+        ranking_keywords = [
+            "rank",
+            "compare",
+            "highest",
+            "lowest",
+            "top",
+            "revenue",
+            "profit",
+            "ebit",
+            "ebitda",
+            "attrition"
+        ]
+
+        query_lower = query.lower()
+
+        if any(
+            keyword in query_lower
+            for keyword in ranking_keywords
+        ):
+            top_k = 15
+        else:
+            top_k = 10
+
+        # ====================
         # RERANK
-        # --------------------
+        # ====================
 
         reranked_docs = self.reranker.rerank(
             query,
             combined_docs,
-            top_k=10
+            top_k=top_k
         )
 
-        
-
-            print(f"\nDOC {i}")
-            print("-" * 40)
-
-            print(doc[:500])
-
-        # --------------------
+        # ====================
         # CONTEXT
-        # --------------------
+        # ====================
 
         context = "\n\n".join(
             reranked_docs
