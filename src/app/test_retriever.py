@@ -2,7 +2,7 @@ from src.retrieval.retriever import Retriever
 
 retriever = Retriever()
 
-query = "Mazagon Dock order book"
+query = "Mazdock order book"
 
 results = retriever.search(
     query,
