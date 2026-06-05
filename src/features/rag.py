@@ -1,101 +1,110 @@
 from src.retrieval.retriever import Retriever
 from src.retrieval.reranker import Reranker
+from src.retrieval.query_decomposer import QueryDecomposer
 
 
 class RAGPipeline:
 
     def __init__(self):
-
         self.retriever = Retriever()
         self.reranker = Reranker()
+        self.decomposer = QueryDecomposer()
 
     def get_context(self, query):
 
-        # ====================
-        # RETRIEVE
-        # ====================
+        # --------------------------------
+        # Query Decomposition
+        # --------------------------------
 
-        results = self.retriever.search(
-            query,
-            n_results=50
-        )
+        subqueries = self.decomposer.decompose(query)
 
-        # ====================
-        # VECTOR RESULTS
-        # ====================
+        all_docs = []
+        all_metadata = []
 
-        vector_docs = (
-            results["vector_results"]["documents"][0]
-        )
+        # --------------------------------
+        # Retrieval
+        # --------------------------------
 
-        vector_metadata = (
-            results["vector_results"]["metadatas"][0]
-        )
+        for subquery in subqueries:
 
-        # ====================
-        # BM25 RESULTS
-        # ====================
-
-        bm25_docs = (
-            results["bm25_results"]
-        )
-
-        # ====================
-        # MERGE + REMOVE DUPES
-        # ====================
-
-        combined_docs = list(
-            dict.fromkeys(
-                vector_docs + bm25_docs
+            results = self.retriever.search(
+                query=subquery,
+                n_results=15
             )
-        )
 
-        # ====================
-        # DYNAMIC RERANK DEPTH
-        # ====================
+            # Vector Search Results
+            vector_docs = (
+                results["vector_results"]["documents"][0]
+                if results["vector_results"]["documents"]
+                else []
+            )
 
-        ranking_keywords = [
-            "rank",
+            vector_metadata = (
+                results["vector_results"]["metadatas"][0]
+                if results["vector_results"]["metadatas"]
+                else []
+            )
+
+            # BM25 Results
+            bm25_docs = results["bm25_results"]
+
+            all_docs.extend(vector_docs)
+            all_docs.extend(bm25_docs)
+
+            all_metadata.extend(vector_metadata)
+
+        # --------------------------------
+        # Deduplicate
+        # --------------------------------
+
+        unique_docs = list(dict.fromkeys(all_docs))
+
+        # --------------------------------
+        # Dynamic Reranking Depth
+        # --------------------------------
+
+        comparison_keywords = [
             "compare",
+            "comparison",
+            "rank",
+            "ranking",
             "highest",
             "lowest",
-            "top",
-            "revenue",
-            "profit",
-            "ebit",
-            "ebitda",
-            "attrition"
+            "best",
+            "worst",
+            "versus",
+            "vs"
         ]
 
         query_lower = query.lower()
 
-        if any(
+        is_comparison = any(
             keyword in query_lower
-            for keyword in ranking_keywords
-        ):
-            top_k = 15
+            for keyword in comparison_keywords
+        )
+
+        if is_comparison:
+            top_k = 20
         else:
             top_k = 10
 
-        # ====================
-        # RERANK
-        # ====================
+        # --------------------------------
+        # Reranking
+        # --------------------------------
 
         reranked_docs = self.reranker.rerank(
-            query,
-            combined_docs,
+            query=query,
+            documents=unique_docs,
             top_k=top_k
         )
 
-        # ====================
-        # CONTEXT
-        # ====================
+        # --------------------------------
+        # Context Creation
+        # --------------------------------
 
-        context = "\n\n".join(
-            reranked_docs
-        )
+        context = "\n\n".join(reranked_docs)
 
         return {
             "context": context,
-            "metadata": vector_metadata
+            "metadata": all_metadata
         }

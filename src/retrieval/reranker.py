@@ -8,7 +8,15 @@ class Reranker:
             "cross-encoder/ms-marco-MiniLM-L-6-v2"
         )
 
-    def rerank(self, query, documents, top_k=10):
+    def rerank(
+        self,
+        query,
+        documents,
+        top_k=25
+    ):
+
+        if not documents:
+            return []
 
         pairs = [
             [query, doc]
@@ -24,8 +32,6 @@ class Reranker:
         )
 
         return [
-    doc
-    for doc, _ in ranked[:top_k]
-]
-    
-    
+            doc
+            for doc, _ in ranked[:top_k]
+        ]

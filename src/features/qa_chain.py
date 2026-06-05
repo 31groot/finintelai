@@ -23,57 +23,45 @@ class QAChain:
         prompt = f"""
 You are an expert financial analyst.
 
-Use ONLY the information present in the provided context.
+Use ONLY the information provided in the context.
 
-Rules:
+IMPORTANT RULES:
 
-1. Never use outside knowledge.
+- Never use outside knowledge.
+- Never invent numbers.
+- Never estimate missing values.
+- If a value is missing, explicitly state that it is not available in the context.
+- When multiple companies appear, extract information for ALL companies before answering.
 
-2. If information is missing from the context, explicitly say so.
+FOR COMPARISON QUESTIONS:
 
-3. If the question asks for:
-   - comparison
-   - ranking
-   - highest
-   - lowest
-   - best
-   - worst
-   - compare
-   - rank
+1. Identify every company mentioned.
+2. Extract the requested metric for each company.
+3. Create a comparison table.
+4. Rank companies from highest to lowest whenever numerical values are available.
+5. Explain the ranking briefly.
 
-   then:
+FOR KPI QUESTIONS:
 
-   a. Extract all relevant company values from the context.
+1. Extract the KPI value.
+2. State the company.
+3. State the reporting period if available.
+4. Provide a concise explanation.
 
-   b. Combine information across multiple chunks.
+OUTPUT FORMAT FOR COMPARISONS:
 
-   c. Compare the values numerically.
+| Company | Metric |
+|----------|----------|
+| Company A | Value |
+| Company B | Value |
 
-   d. Return a ranked list whenever possible.
+Ranking:
+1. ...
+2. ...
+3. ...
 
-4. Do NOT say "only one company is mentioned"
-   unless there is truly only one company
-   in the provided context.
-
-5. If multiple companies appear in the context,
-   identify each company and its corresponding value
-   before answering.
-
-6. For revenue questions:
-
-   - Extract revenue figures for every company found.
-
-   - Rank companies from highest revenue to lowest revenue.
-
-7. Think step-by-step:
-
-   - Identify companies.
-   - Extract values.
-   - Compare values.
-   - Then answer.
-
-Never estimate or infer missing financial values.
-Use only explicitly stated values from the context.
+Explanation:
+...
 
 Context:
 {context}
@@ -97,13 +85,14 @@ Answer:
 
         answer = response.choices[0].message.content
 
-        # =========================
-        # SOURCE ATTRIBUTION
-        # =========================
+        # ---------------------------------
+        # Source Attribution
+        # ---------------------------------
 
         citations = "\n\nSources:\n"
 
         seen = set()
+        count = 0
 
         for item in sources:
 
@@ -120,5 +109,11 @@ Answer:
                 )
 
                 seen.add(key)
+
+                count += 1
+
+                # Limit displayed sources
+                if count >= 15:
+                    break
 
         return answer + citations
