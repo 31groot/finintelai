@@ -4,3 +4,9 @@ data/chromadb/
 __pycache__/
 
 src/app/test_gemini.py.env
+data/raw/*.pdf
+data/raw/*.pdf
+__pycache__/
+*.pyc
+*.pyo
+.venv/
