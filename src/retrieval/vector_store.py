@@ -4,26 +4,16 @@ class VectorStore:
 
     def __init__(self):
 
-        self.client = chromadb.PersistentClient(
-            path="data/chromadb"
-        )
-
-        self.collection = self.client.get_or_create_collection(
-            name="finintelai"
-        )
+        self.client = chromadb.PersistentClient(path="data/chromadb")
+        self.collection = self.client.get_or_create_collection(name="finintelai")
 
     def reset(self):
-
         try:
-            self.client.delete_collection(
-                name="finintelai"
-            )
-        except:
+            self.client.delete_collection(name="finintelai")
+        except ValueError:
             pass
 
-        self.collection = self.client.get_or_create_collection(
-            name="finintelai"
-        )
+        self.collection = self.client.get_or_create_collection(name="finintelai")
 
         print("Collection reset.")
 

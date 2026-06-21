@@ -6,7 +6,6 @@ from src.ingestion.table_chunker import chunk_tables
 from src.retrieval.embeddings import EmbeddingModel
 from src.retrieval.vector_store import VectorStore
 
-
 def main():
     pdf_files = list(Path("data/raw").glob("*.pdf"))
 
@@ -21,7 +20,6 @@ def main():
         source_name = pdf_path.stem
         print("\n" + "=" * 60)
         print(f"Processing: {source_name}")
-        print("=" * 60)
 
         print("Loading PDF pages...")
         pages = load_pdf_pages(str(pdf_path))
@@ -70,7 +68,6 @@ def main():
     store.reset()
     store.add_documents(all_chunks, embeddings, all_metadata)
     print(f"Total documents in DB: {store.count()}")
-
 
 if __name__ == "__main__":
     main()

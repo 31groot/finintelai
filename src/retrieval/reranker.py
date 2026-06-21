@@ -2,16 +2,13 @@ from sentence_transformers import CrossEncoder
 class Reranker:
 
     def __init__(self):
-        self.model = CrossEncoder(
-            "cross-encoder/ms-marco-MiniLM-L-6-v2"
-        )
-
+        self.model = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
     def rerank(
         self,
         query,
         documents,
         metadata,
-        top_k=25
+        top_k=22
     ):
 
         if not documents:

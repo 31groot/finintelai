@@ -1,11 +1,12 @@
 from dotenv import load_dotenv
-from groq import Groq
+from groq import Groq, GroqError
 from src.features.rag import RAGPipeline
 
 load_dotenv()
 
 
 class QAChain:
+
     def __init__(self):
         self.rag = RAGPipeline()
         self.client = Groq()
@@ -45,6 +46,7 @@ COMPARISON VALIDATION:
   - Only rank companies that share the same unit and currency.
 
 Examples:
+
 Correct:
 TCS: ₹240,893 crore
 Infosys: ₹153,670 crore
@@ -73,8 +75,10 @@ OUTPUT FORMAT FOR COMPARISONS:
 
 Unit Validation:
 ...
+
 Ranking:
 ...
+
 Explanation:
 ...
 
@@ -87,11 +91,17 @@ Question:
 Answer:
 """
 
-        response = self.client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0,
-        )
+        try:
+            response = self.client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0,
+            )
+        except GroqError as e:
+            return (
+                "Sorry, I couldn't reach the AI service right now "
+                f"({type(e).__name__}). Please try again in a moment."
+            )
 
         answer = response.choices[0].message.content
 
@@ -103,11 +113,13 @@ Answer:
             source = item.get("source")
             page = item.get("page")
             key = (source, page)
+
             if key not in seen:
                 citations += f"- {source} (page {page})\n"
                 seen.add(key)
                 count += 1
-                if count >= 15:
-                    break
+
+            if count >= 15:
+                break
 
         return answer + citations
