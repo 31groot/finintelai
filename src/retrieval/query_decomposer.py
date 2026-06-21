@@ -54,13 +54,12 @@ metric_keywords = [
 ]
 
 metric_retrieval_map = {
-    "revenue": "revenue revenue from operations total income turnover sales",
-    "profit": "profit net profit PAT profit after tax earnings",
+    "revenue": "revenue revenue from operations total income turnover sales consolidated revenue standalone revenue IT services revenue",
+    "profit": "profit net profit PAT profit after tax earnings profit attributable to equity holders net income profit for the year",
     "ebitda": "ebitda earnings before interest tax depreciation amortization operating profit",
-    "attrition": "attrition employee turnover workforce attrition",
-    "margin": "margin operating margin profit margin EBITDA margin",
+    "attrition": "attrition voluntary attrition employee turnover workforce attrition excluding DOP annual attrition rate",
+    "margin": "margin operating margin EBITDA margin EBIT margin profit margin net profit margin gross margin operating income margin net income to turnover",
 }
-
 temporal_words = [
     "by year",
     "year wise",
@@ -91,10 +90,14 @@ temporal_words = [
 
 class QueryDecomposer:
 
-    def decompose(self, query):
+    def decompose(self, query, memory_companies=None):
         query_lower = query.lower()
 
         companies = self._find_companies(query_lower)
+
+        if not companies and memory_companies:
+            companies = memory_companies
+
         metrics = self._find_metrics(query_lower)
 
         is_comparison = any(
@@ -230,7 +233,6 @@ class QueryDecomposer:
 
         if len(companies) == 1 and is_description:
             company = companies[0]
-
             company_text = company_retrieval_map.get(
                 company,
                 company

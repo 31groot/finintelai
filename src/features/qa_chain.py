@@ -10,9 +10,112 @@ class QAChain:
     def __init__(self):
         self.rag = RAGPipeline()
         self.client = Groq()
+        self.memory = {"companies": []}
+
+    def _needs_company_clarification(self, query):
+        query_lower = query.lower()
+
+        companies = self.rag.decomposer._find_companies(query_lower)
+        metrics = self.rag.decomposer._find_metrics(query_lower)
+
+        has_memory = bool(self.memory["companies"])
+
+        description_words = [
+            "what does",
+            "business",
+            "company",
+            "do",
+            "overview",
+            "services",
+            "operations",
+        ]
+
+        comparison_words = [
+            "compare",
+            "comparison",
+            "rank",
+            "ranking",
+            "highest",
+            "lowest",
+            "best",
+            "worst",
+            "better",
+            "versus",
+            "vs",
+        ]
+
+        temporal_words = [
+            "by year",
+            "year wise",
+            "year-wise",
+            "over the years",
+            "across years",
+            "last 3 years",
+            "last 5 years",
+            "past 3 years",
+            "past 5 years",
+            "trend",
+            "historical",
+            "history",
+            "over time",
+            "yearly",
+            "fy24",
+            "fy23",
+            "fy22",
+            "fy21",
+            "fy20",
+            "fiscal 2024",
+            "fiscal 2023",
+            "fiscal 2022",
+            "fiscal 2021",
+            "fiscal 2020",
+        ]
+
+        is_description = any(
+            word in query_lower
+            for word in description_words
+        )
+
+        is_comparison = any(
+            word in query_lower
+            for word in comparison_words
+        )
+
+        is_temporal = any(
+            word in query_lower
+            for word in temporal_words
+        )
+
+        if companies:
+            return False
+
+        if has_memory:
+            return False
+
+        if metrics or is_description or is_comparison or is_temporal:
+            return True
+
+        return False
 
     def ask(self, query):
-        result = self.rag.get_context(query)
+        if self._needs_company_clarification(query):
+            return (
+                "Which company do you want this for — "
+                "TCS, Infosys, Wipro, or Mazagon Dock?"
+            )
+
+        current_companies = self.rag.decomposer._find_companies(
+            query.lower()
+        )
+
+        if current_companies:
+            self.memory["companies"] = current_companies
+
+        result = self.rag.get_context(
+            query,
+            memory_companies=self.memory["companies"]
+        )
+
         context = result["context"]
         sources = result["metadata"]
 
@@ -26,6 +129,9 @@ IMPORTANT RULES:
 - Never estimate missing values.
 - If a value is missing, explicitly state that it is not available in the context.
 - When multiple companies appear, extract information for ALL companies before answering.
+- Never calculate a financial or HR metric unless the context explicitly provides all required components and the question asks for a calculation.
+- For attrition, EBITDA margin, profit margin, or similar metrics, do NOT derive the value from employee counts or other proxy values unless the report explicitly states the metric or explicitly provides the exact formula inputs for that metric.
+- If the requested metric is not explicitly available in the context, say it is not available in the retrieved context. Do not infer it.
 
 FOR COMPARISON QUESTIONS:
 1. Identify every company mentioned.

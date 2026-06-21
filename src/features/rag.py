@@ -14,6 +14,15 @@ compare_keywords = [
     "versus",
     "vs"
 ]
+
+company_source_map = {
+    "tcs": "tcs_fy24",
+    "infosys": "infosys_fy24",
+    "wipro": "wipro_fy24",
+    "mazdock": "mazdock_fy24",
+}
+
+
 class RAGPipeline:
 
     def __init__(self):
@@ -21,21 +30,33 @@ class RAGPipeline:
         self.reranker = Reranker()
         self.decomposer = QueryDecomposer()
 
-    def get_context(self, query):
+    def _get_company_for_subquery(self, subquery):
+        subquery_lower = subquery.lower()
+        companies = self.decomposer._find_companies(subquery_lower)
 
-        subqueries = self.decomposer.decompose(query)
+        if companies:
+            return companies[0]
+
+        return None
+
+    def get_context(self, query, memory_companies=None):
+        subqueries = self.decomposer.decompose(
+            query,
+            memory_companies=memory_companies
+        )
+
+   
 
         query_lower = query.lower()
         is_comparison = any(
             keyword in query_lower
-            for keyword in compare_keywords 
+            for keyword in compare_keywords
         )
 
         balanced_docs = []
         balanced_metadata = []
 
         for subquery in subqueries:
-
             results = self.retriever.search(
                 query=subquery,
                 n_results=22 if is_comparison else 15
@@ -43,7 +64,7 @@ class RAGPipeline:
 
             vector_docs = results["documents"]
             vector_metadata = results["metadata"]
-            
+
             seen_docs = set()
             docs = []
             metadata = []
@@ -53,6 +74,23 @@ class RAGPipeline:
                     seen_docs.add(doc)
                     docs.append(doc)
                     metadata.append(meta)
+
+            company = self._get_company_for_subquery(subquery)
+
+            if company and company in company_source_map:
+                target_source = company_source_map[company]
+
+                filtered_docs = []
+                filtered_metadata = []
+
+                for doc, meta in zip(docs, metadata):
+                    if meta.get("source") == target_source:
+                        filtered_docs.append(doc)
+                        filtered_metadata.append(meta)
+
+                if filtered_docs:
+                    docs = filtered_docs
+                    metadata = filtered_metadata
 
             if is_comparison:
                 if len(subqueries) == 1:
@@ -79,6 +117,8 @@ class RAGPipeline:
                 metadata=metadata,
                 top_k=rerank_top_k
             )
+
+
 
             for doc, meta, score in top_results:
                 balanced_docs.append(doc)

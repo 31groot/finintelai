@@ -2,14 +2,18 @@ from src.features.qa_chain import QAChain
 
 qa_chain = QAChain()
 
-print("\nFinancial RAG Chatbot Ready")
+print("Financial RAG Chatbot Ready")
 print("Type 'exit' to quit.\n")
 
 while True:
-    question = input("Ask: ")
+    question = input("Ask: ").strip()
 
     if question.lower() in ["exit", "quit"]:
         break
+
+    if not question:
+        print("\nPlease enter a question.\n")
+        continue
 
     try:
         answer = qa_chain.ask(question)
