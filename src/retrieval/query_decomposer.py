@@ -2,23 +2,24 @@ import re
 
 
 company_aliases = {
-    "mazagon dock shipbuilders": "mazdock",
-    "mazagon dockship": "mazdock",
-    "mazagondockship": "mazdock",
-    "mazagon dock": "mazdock",
-    "mazagondock": "mazdock",
-    "mazagon": "mazdock",
-    "mazdock": "mazdock",
-    "tcs": "tcs",
-    "infosys": "infosys",
-    "wipro": "wipro",
+    "tcs": [
+        "tcs",
+        "tata consultancy services",
+        "tata consultancy",
+        "tata_consultancy_services",
+    ],
+    "infosys": [
+        "infosys",
+    ],
+    "wipro": [
+        "wipro",
+    ],
 }
 
 company_retrieval_map = {
     "tcs": "Tata Consultancy Services TCS",
     "infosys": "Infosys",
     "wipro": "Wipro",
-    "mazdock": "Mazagon Dock Shipbuilders Mazagon Dock MDL",
 }
 
 comparison_words = [
@@ -57,17 +58,20 @@ metric_retrieval_map = {
     "revenue": "revenue revenue from operations total income turnover sales consolidated revenue standalone revenue IT services revenue",
     "profit": "profit net profit PAT profit after tax earnings profit attributable to equity holders net income profit for the year",
     "ebitda": "ebitda earnings before interest tax depreciation amortization operating profit",
-    "attrition": "attrition voluntary attrition employee turnover workforce attrition excluding DOP annual attrition rate",
-    "margin": "margin operating margin EBITDA margin EBIT margin profit margin net profit margin gross margin operating income margin net income to turnover",
+    "attrition": "attrition voluntary attrition employee turnover workforce attrition annual attrition rate",
+    "margin": "margin operating margin EBITDA margin EBIT margin profit margin net profit margin gross margin operating income margin",
 }
+
 temporal_words = [
     "by year",
     "year wise",
     "year-wise",
     "over the years",
     "across years",
+    "last 2 years",
     "last 3 years",
     "last 5 years",
+    "past 2 years",
     "past 3 years",
     "past 5 years",
     "trend",
@@ -75,21 +79,21 @@ temporal_words = [
     "history",
     "over time",
     "yearly",
+    "fy26",
+    "fy25",
     "fy24",
     "fy23",
-    "fy22",
-    "fy21",
-    "fy20",
+    "fiscal 2026",
+    "fiscal 2025",
     "fiscal 2024",
     "fiscal 2023",
-    "fiscal 2022",
-    "fiscal 2021",
-    "fiscal 2020",
 ]
+
+# newest -> oldest
+available_fiscal_years = ["FY26", "FY25", "FY24", "FY23"]
 
 
 class QueryDecomposer:
-
     def decompose(self, query, memory_companies=None):
         query_lower = query.lower()
 
@@ -100,143 +104,120 @@ class QueryDecomposer:
 
         metrics = self._find_metrics(query_lower)
 
-        is_comparison = any(
-            word in query_lower
-            for word in comparison_words
+        is_comparison = any(word in query_lower for word in comparison_words)
+        is_description = any(word in query_lower for word in description_words)
+
+        explicit_years = self._extract_explicit_fiscal_years(query_lower)
+        requested_years = self._get_requested_temporal_years(
+            query_lower,
+            explicit_years
         )
 
-        is_description = any(
-            word in query_lower
-            for word in description_words
-        )
-
-        is_temporal = any(
-            word in query_lower
-            for word in temporal_words
-        )
-
+        # Comparison + metric
         if companies and is_comparison and metrics:
             subqueries = []
 
             for company in companies:
-                company_text = company_retrieval_map.get(
-                    company,
-                    company
-                )
+                company_text = company_retrieval_map.get(company, company)
 
                 for metric in metrics:
-                    metric_text = metric_retrieval_map.get(
-                        metric,
-                        metric
-                    )
+                    metric_text = metric_retrieval_map.get(metric, metric)
 
+                    if requested_years:
+                        for fiscal_year in requested_years:
+                            subqueries.append(
+                                f"{company_text} {metric_text} {fiscal_year}"
+                            )
+                    else:
+                        subqueries.append(
+                            f"{company_text} {metric_text}"
+                        )
+
+            return subqueries
+
+        # Comparison without explicit metric -> default to revenue
+        if companies and is_comparison:
+            subqueries = []
+
+            for company in companies:
+                company_text = company_retrieval_map.get(company, company)
+                metric_text = metric_retrieval_map["revenue"]
+
+                if requested_years:
+                    for fiscal_year in requested_years:
+                        subqueries.append(
+                            f"{company_text} {metric_text} {fiscal_year}"
+                        )
+                else:
                     subqueries.append(
                         f"{company_text} {metric_text}"
                     )
 
             return subqueries
 
-        if companies and is_comparison:
-            subqueries = []
-
-            for company in companies:
-                company_text = company_retrieval_map.get(
-                    company,
-                    company
-                )
-
-                metric_text = metric_retrieval_map["revenue"]
-
-                subqueries.append(
-                    f"{company_text} {metric_text}"
-                )
-
-            return subqueries
-
+        # Multi-company business description
         if len(companies) > 1 and is_description:
             subqueries = []
 
             for company in companies:
-                company_text = company_retrieval_map.get(
-                    company,
-                    company
-                )
-
+                company_text = company_retrieval_map.get(company, company)
                 subqueries.append(
                     f"{company_text} business overview services operations company profile"
                 )
 
             return subqueries
 
-        if len(companies) == 1 and metrics and is_temporal:
+        # Single-company temporal metric query
+        if len(companies) == 1 and metrics and requested_years:
             company = companies[0]
-            company_text = company_retrieval_map.get(
-                company,
-                company
-            )
+            company_text = company_retrieval_map.get(company, company)
 
             subqueries = []
 
             for metric in metrics:
-                metric_text = metric_retrieval_map.get(
-                    metric,
-                    metric
-                )
+                metric_text = metric_retrieval_map.get(metric, metric)
 
-                subqueries.append(
-                    f"{company_text} {metric_text} year wise yearly historical trend fiscal 2024 fiscal 2023 fiscal 2022 fiscal 2021 fiscal 2020"
-                )
+                for fiscal_year in requested_years:
+                    subqueries.append(
+                        f"{company_text} {metric_text} {fiscal_year}"
+                    )
 
             return subqueries
 
-        if len(companies) > 1 and metrics and is_temporal:
+        # Multi-company temporal metric query
+        if len(companies) > 1 and metrics and requested_years:
             subqueries = []
 
             for company in companies:
-                company_text = company_retrieval_map.get(
-                    company,
-                    company
-                )
+                company_text = company_retrieval_map.get(company, company)
 
                 for metric in metrics:
-                    metric_text = metric_retrieval_map.get(
-                        metric,
-                        metric
-                    )
+                    metric_text = metric_retrieval_map.get(metric, metric)
 
-                    subqueries.append(
-                        f"{company_text} {metric_text} year wise yearly historical trend fiscal 2024 fiscal 2023 fiscal 2022 fiscal 2021 fiscal 2020"
-                    )
+                    for fiscal_year in requested_years:
+                        subqueries.append(
+                            f"{company_text} {metric_text} {fiscal_year}"
+                        )
 
             return subqueries
 
+        # Single-company metric query
         if len(companies) == 1 and metrics:
             company = companies[0]
-            company_text = company_retrieval_map.get(
-                company,
-                company
-            )
+            company_text = company_retrieval_map.get(company, company)
 
             subqueries = []
 
             for metric in metrics:
-                metric_text = metric_retrieval_map.get(
-                    metric,
-                    metric
-                )
-
-                subqueries.append(
-                    f"{company_text} {metric_text}"
-                )
+                metric_text = metric_retrieval_map.get(metric, metric)
+                subqueries.append(f"{company_text} {metric_text}")
 
             return subqueries
 
+        # Single-company business description
         if len(companies) == 1 and is_description:
             company = companies[0]
-            company_text = company_retrieval_map.get(
-                company,
-                company
-            )
+            company_text = company_retrieval_map.get(company, company)
 
             return [
                 f"{company_text} business overview services operations company profile"
@@ -244,18 +225,61 @@ class QueryDecomposer:
 
         return [query]
 
+    def _extract_explicit_fiscal_years(self, query_lower):
+        years = []
+
+        fy_matches = re.findall(r"\bfy[\s_-]?(\d{2,4})\b", query_lower)
+        for year in fy_matches:
+            if len(year) == 2:
+                years.append(f"FY{year}")
+            else:
+                years.append(f"FY{year[-2:]}")
+
+        fiscal_matches = re.findall(r"\bfiscal[\s_-]?(\d{4})\b", query_lower)
+        for year in fiscal_matches:
+            years.append(f"FY{year[-2:]}")
+
+        seen = set()
+        normalized = []
+
+        for year in years:
+            year = year.upper()
+            if year not in seen:
+                seen.add(year)
+                normalized.append(year)
+
+        return normalized
+
+    def _get_requested_temporal_years(self, query_lower, explicit_years):
+        if explicit_years:
+            return explicit_years
+
+        if "last 2 years" in query_lower or "past 2 years" in query_lower:
+            return available_fiscal_years[:2]
+
+        if "last 3 years" in query_lower or "past 3 years" in query_lower:
+            return available_fiscal_years[:3]
+
+        if "last 5 years" in query_lower or "past 5 years" in query_lower:
+            return available_fiscal_years[:5]
+
+        is_temporal = any(word in query_lower for word in temporal_words)
+        if is_temporal:
+            return available_fiscal_years
+
+        return []
+
     def _find_companies(self, query_lower):
         companies = []
 
-        for alias, company in company_aliases.items():
-            if company in companies:
+        for canonical_company, aliases in company_aliases.items():
+            if canonical_company in companies:
                 continue
 
-            if re.search(
-                rf"\b{re.escape(alias)}\b",
-                query_lower
-            ):
-                companies.append(company)
+            for alias in aliases:
+                if re.search(rf"\b{re.escape(alias)}\b", query_lower):
+                    companies.append(canonical_company)
+                    break
 
         return companies
 
