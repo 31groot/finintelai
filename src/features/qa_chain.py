@@ -13,7 +13,8 @@ class QAChain:
         self.client = Groq()
         self.memory = {
             "companies": [],
-            "pending_year_clarification": None
+            "pending_year_clarification": None,
+            "pending_company_clarification": None,
         }
 
         self.comparison_words = [
@@ -165,12 +166,18 @@ GENERAL RULES:
 - Use only values that are explicitly present in the context.
 - Never calculate a financial or HR metric unless the context explicitly provides all required components and the user asks for a calculation.
 - For attrition, EBITDA margin, profit margin, or similar metrics, do NOT derive values from employee counts or proxy values unless the report explicitly states the metric or explicitly provides the exact formula inputs.
+- Never convert revenue, profit, EBITDA, attrition, or margin values from one unit/currency to another unless the user explicitly asks for conversion.
+- Never derive a missing company value using exchange rates, percentages, ratios, prior-year values, or arithmetic from other numbers in the context.
+- If a company's metric for the requested fiscal year is not explicitly stated in the retrieved context, write exactly: Not available in the retrieved context.
 - If the query refers to one company, answer only for that company unless the question explicitly asks for comparison.
 - Only output a fiscal year / reporting period if that exact year / period is explicitly present in the retrieved context.
 - Preserve the exact fiscal-year labels from the retrieved context whenever possible.
 - If the query asks for a comparison in a specific fiscal year, use only that fiscal year and do not mix rows from different years.
 - If the query asks for a year-wise trend or history, include only the fiscal years explicitly present in the retrieved context for that company and metric.
 - Do not create extra years that are not explicitly present in the retrieved context.
+- If a number is present but its unit/currency is not explicitly tied to that number in the retrieved context, do not guess the unit/currency.
+- In that case, output the value only if the metric-year-company match is explicit; otherwise write: Not available in the retrieved context.
+- Never use phrases like "assuming", "appears to be", "likely", or "based on other parts of the context" in the final answer.
 
 QUESTION TYPES AND REQUIRED OUTPUT:
 
@@ -224,6 +231,9 @@ Required steps:
 COMPARISON RULES:
 - Use the fiscal year explicitly mentioned in the question if present.
 - If the context contains multiple fiscal years, do not mix years in a comparison table.
+- For each company, use only the value explicitly stated for that company in the requested fiscal year.
+- Do not derive or back-calculate one company's value from another metric such as constant-currency revenue, IT services revenue, USD revenue, growth rate, exchange rate, or segment revenue.
+- If Wipro or any other company is reported in a different unit or only with a different metric, do not transform it. Mark it as not directly comparable or not available in the retrieved context.
 - If all companies use the same unit and currency, compare them numerically and rank them.
 - If one or more companies use different units or currencies, explicitly state that they cannot be directly compared without normalization.
 - Do NOT rank companies together if their units/currencies differ.
@@ -233,6 +243,8 @@ COMPARISON RULES:
 - If units differ, the Ranking section must contain exactly:
   Ranking not possible because the reported units/currencies differ across companies.
 - If one company's value is missing, explicitly say it is not available in the retrieved context.
+- If a company's metric value is present but the unit/currency is unclear or not explicitly attached to that same value in the retrieved context, do not infer it from other sections.
+- Do not write assumptions about a company’s unit/currency. Use "Not available in the retrieved context" if needed.
 
 Output format:
 | Company | Metric | Value | Unit/Currency |
@@ -314,6 +326,46 @@ Answer:
 
         return citations
 
+    def _handle_pending_company_clarification(self, query):
+        pending = self.memory.get("pending_company_clarification")
+        if not pending:
+            return None
+
+        query_clean = query.strip().lower()
+        
+        clarification_patterns = [
+            r"^(for\s+)?tcs$",
+            r"^(for\s+)?infosys$",
+            r"^(for\s+)?wipro$",
+            r"^(for\s+)?tata consultancy services$",
+            r"^(for\s+)?tata consultancy$",
+        ]
+
+        is_company_only_reply = any(
+            re.fullmatch(pattern, query_clean) for pattern in clarification_patterns
+        )
+
+        if not is_company_only_reply:
+            return None
+
+        companies = self.rag.decomposer._find_companies(query_clean)
+
+        if not companies:
+            return {
+                "ok": False,
+                "needs_clarification": True,
+                "clarification_type": "company",
+                "error": "Please choose a valid company: TCS, Infosys, or Wipro."
+            }
+
+        selected_company = companies[0]
+        original_query = pending["original_query"]
+        resolved_query = f"{original_query} for {selected_company}"
+
+        self.memory["companies"] = [selected_company]
+        self.memory["pending_company_clarification"] = None
+        return {"resolved_query": resolved_query}
+
     def _handle_pending_year_clarification(self, query):
         pending = self.memory.get("pending_year_clarification")
         if not pending:
@@ -341,7 +393,7 @@ Answer:
 
         original_query = pending["original_query"]
         resolved_query = f"{original_query} in {year}"
-        
+
         self._update_memory(original_query)
         self.memory["pending_year_clarification"] = None
         return {"resolved_query": resolved_query}
@@ -355,14 +407,25 @@ Answer:
                 "error": "Please enter a question."
             }
 
-        pending_resolution = self._handle_pending_year_clarification(query)
-        if pending_resolution:
-            if "resolved_query" in pending_resolution:
-                query = pending_resolution["resolved_query"]
+        pending_company_resolution = self._handle_pending_company_clarification(query)
+        if pending_company_resolution:
+            if "resolved_query" in pending_company_resolution:
+                query = pending_company_resolution["resolved_query"]
             else:
-                return pending_resolution
+                return pending_company_resolution
+
+        pending_year_resolution = self._handle_pending_year_clarification(query)
+        if pending_year_resolution:
+            if "resolved_query" in pending_year_resolution:
+                query = pending_year_resolution["resolved_query"]
+            else:
+                return pending_year_resolution
 
         if self._needs_company_clarification(query):
+            self.memory["pending_company_clarification"] = {
+                "original_query": query
+            }
+
             return {
                 "ok": False,
                 "needs_clarification": True,

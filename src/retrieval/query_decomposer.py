@@ -89,7 +89,7 @@ temporal_words = [
     "fiscal 2023",
 ]
 
-# newest -> oldest
+
 available_fiscal_years = ["FY26", "FY25", "FY24", "FY23"]
 
 
@@ -113,7 +113,7 @@ class QueryDecomposer:
             explicit_years
         )
 
-        # Comparison + metric
+
         if companies and is_comparison and metrics:
             subqueries = []
 
@@ -135,7 +135,7 @@ class QueryDecomposer:
 
             return subqueries
 
-        # Comparison without explicit metric -> default to revenue
+
         if companies and is_comparison:
             subqueries = []
 
@@ -155,7 +155,7 @@ class QueryDecomposer:
 
             return subqueries
 
-        # Multi-company business description
+
         if len(companies) > 1 and is_description:
             subqueries = []
 
@@ -167,7 +167,6 @@ class QueryDecomposer:
 
             return subqueries
 
-        # Single-company temporal metric query
         if len(companies) == 1 and metrics and requested_years:
             company = companies[0]
             company_text = company_retrieval_map.get(company, company)
@@ -184,7 +183,7 @@ class QueryDecomposer:
 
             return subqueries
 
-        # Multi-company temporal metric query
+       
         if len(companies) > 1 and metrics and requested_years:
             subqueries = []
 
@@ -201,7 +200,6 @@ class QueryDecomposer:
 
             return subqueries
 
-        # Single-company metric query
         if len(companies) == 1 and metrics:
             company = companies[0]
             company_text = company_retrieval_map.get(company, company)
@@ -214,7 +212,6 @@ class QueryDecomposer:
 
             return subqueries
 
-        # Single-company business description
         if len(companies) == 1 and is_description:
             company = companies[0]
             company_text = company_retrieval_map.get(company, company)

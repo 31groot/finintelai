@@ -68,8 +68,7 @@ class RAGPipeline:
         if companies:
             filters["companies"] = companies
 
-        # Prefer fiscal year explicitly attached to the decomposed subquery.
-        # If none exists there, fall back to the original query.
+
         fiscal_years = self._extract_fiscal_years(subquery)
         if not fiscal_years:
             fiscal_years = self._extract_fiscal_years(query)
