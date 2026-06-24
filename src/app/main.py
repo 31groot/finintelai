@@ -37,6 +37,24 @@ doc_type_patterns = {
     ],
 }
 
+CONSOLIDATED_MARKERS = [
+    "consolidated statement",
+    "consolidated balance sheet",
+    "consolidated cash flow",
+    "consolidated profit and loss",
+    "notes to consolidated",
+    "consolidated statement of changes",
+]
+
+STANDALONE_MARKERS = [
+    "standalone statement",
+    "standalone balance sheet",
+    "standalone cash flow",
+    "standalone profit and loss",
+    "notes to standalone",
+    "standalone statement of changes",
+]
+
 
 def infer_company_from_source(source_name: str):
     source_lower = source_name.lower()
@@ -86,6 +104,20 @@ def infer_quarter_from_source(source_name: str):
     return None
 
 
+def infer_statement_type(page_text: str) -> str:
+    text_lower = page_text.lower()
+
+    for marker in CONSOLIDATED_MARKERS:
+        if marker in text_lower:
+            return "consolidated"
+
+    for marker in STANDALONE_MARKERS:
+        if marker in text_lower:
+            return "standalone"
+
+    return "general"
+
+
 def parse_source_metadata(source_name: str):
     return {
         "source": source_name,
@@ -97,7 +129,7 @@ def parse_source_metadata(source_name: str):
     }
 
 
-def build_chunk_metadata(source_meta, page=None, chunk_type="text", extra=None):
+def build_chunk_metadata(source_meta, page=None, chunk_type="text", extra=None, page_text=""):
     metadata = {
         "source": source_meta.get("source") or "",
         "company": source_meta.get("company") or "",
@@ -107,6 +139,7 @@ def build_chunk_metadata(source_meta, page=None, chunk_type="text", extra=None):
         "report_date": source_meta.get("report_date") or "",
         "page": page if page is not None else -1,
         "chunk_type": chunk_type or "",
+        "statement_type": infer_statement_type(page_text) if page_text else "general",
     }
 
     if extra:
@@ -178,7 +211,8 @@ def main():
                     build_chunk_metadata(
                         source_meta=source_meta,
                         page=page_num,
-                        chunk_type="text"
+                        chunk_type="text",
+                        page_text=page_text
                     )
                 )
 

@@ -39,11 +39,8 @@ comparison_words = [
 description_words = [
     "what does",
     "business",
-    "company",
     "do",
     "overview",
-    "services",
-    "operations",
 ]
 
 metric_keywords = [
@@ -55,11 +52,11 @@ metric_keywords = [
 ]
 
 metric_retrieval_map = {
-    "revenue": "revenue revenue from operations total income turnover sales consolidated revenue standalone revenue IT services revenue",
-    "profit": "profit net profit PAT profit after tax earnings profit attributable to equity holders net income profit for the year",
-    "ebitda": "ebitda earnings before interest tax depreciation amortization operating profit",
+    "revenue": "revenue consolidated revenue from operations total income turnover sales consolidated financial statements",
+    "profit": "consolidated profit after tax consolidated PAT profit attributable to equity holders consolidated net profit net income consolidated statement of profit and loss",
+    "ebitda": "consolidated ebitda earnings before interest tax depreciation amortization consolidated operating profit",
     "attrition": "attrition voluntary attrition employee turnover workforce attrition annual attrition rate",
-    "margin": "margin operating margin EBITDA margin EBIT margin profit margin net profit margin gross margin operating income margin",
+    "margin": "consolidated margin consolidated operating margin EBITDA margin EBIT margin profit margin consolidated net profit margin",
 }
 
 temporal_words = [
@@ -89,11 +86,13 @@ temporal_words = [
     "fiscal 2023",
 ]
 
-
 available_fiscal_years = ["FY26", "FY25", "FY24", "FY23"]
+
+FINANCIAL_METRICS = {"revenue", "profit", "ebitda", "margin"}
 
 
 class QueryDecomposer:
+
     def decompose(self, query, memory_companies=None):
         query_lower = query.lower()
 
@@ -113,6 +112,8 @@ class QueryDecomposer:
             explicit_years
         )
 
+        needs_consolidated = bool(metrics & FINANCIAL_METRICS)
+        statement_type_filter = "consolidated" if needs_consolidated else None
 
         if companies and is_comparison and metrics:
             subqueries = []
@@ -133,8 +134,10 @@ class QueryDecomposer:
                             f"{company_text} {metric_text}"
                         )
 
-            return subqueries
-
+            return {
+                "subqueries": subqueries,
+                "statement_type": statement_type_filter,
+            }
 
         if companies and is_comparison:
             subqueries = []
@@ -153,8 +156,10 @@ class QueryDecomposer:
                         f"{company_text} {metric_text}"
                     )
 
-            return subqueries
-
+            return {
+                "subqueries": subqueries,
+                "statement_type": "consolidated",
+            }
 
         if len(companies) > 1 and is_description:
             subqueries = []
@@ -165,7 +170,10 @@ class QueryDecomposer:
                     f"{company_text} business overview services operations company profile"
                 )
 
-            return subqueries
+            return {
+                "subqueries": subqueries,
+                "statement_type": None,
+            }
 
         if len(companies) == 1 and metrics and requested_years:
             company = companies[0]
@@ -181,9 +189,11 @@ class QueryDecomposer:
                         f"{company_text} {metric_text} {fiscal_year}"
                     )
 
-            return subqueries
+            return {
+                "subqueries": subqueries,
+                "statement_type": statement_type_filter,
+            }
 
-       
         if len(companies) > 1 and metrics and requested_years:
             subqueries = []
 
@@ -198,7 +208,10 @@ class QueryDecomposer:
                             f"{company_text} {metric_text} {fiscal_year}"
                         )
 
-            return subqueries
+            return {
+                "subqueries": subqueries,
+                "statement_type": statement_type_filter,
+            }
 
         if len(companies) == 1 and metrics:
             company = companies[0]
@@ -210,17 +223,26 @@ class QueryDecomposer:
                 metric_text = metric_retrieval_map.get(metric, metric)
                 subqueries.append(f"{company_text} {metric_text}")
 
-            return subqueries
+            return {
+                "subqueries": subqueries,
+                "statement_type": statement_type_filter,
+            }
 
         if len(companies) == 1 and is_description:
             company = companies[0]
             company_text = company_retrieval_map.get(company, company)
 
-            return [
-                f"{company_text} business overview services operations company profile"
-            ]
+            return {
+                "subqueries": [
+                    f"{company_text} business overview services operations company profile"
+                ],
+                "statement_type": None,
+            }
 
-        return [query]
+        return {
+            "subqueries": [query],
+            "statement_type": None,
+        }
 
     def _extract_explicit_fiscal_years(self, query_lower):
         years = []
@@ -281,8 +303,8 @@ class QueryDecomposer:
         return companies
 
     def _find_metrics(self, query_lower):
-        return [
+        return set(
             metric
             for metric in metric_keywords
             if metric in query_lower
-        ]
+        )

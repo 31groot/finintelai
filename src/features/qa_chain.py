@@ -1,5 +1,4 @@
 import re
-
 from dotenv import load_dotenv
 from groq import Groq, GroqError
 from src.features.rag import RAGPipeline
@@ -154,131 +153,63 @@ class QAChain:
 
     def _build_prompt(self, query, context):
         return f"""
-You are an expert financial analyst.
-Use ONLY the information provided in the context.
-
-GENERAL RULES:
-- Never use outside knowledge.
-- Never invent numbers.
-- Never invent a fiscal year, reporting period, or quarter.
-- Never estimate missing values.
-- If a value is missing, explicitly say it is not available in the retrieved context.
-- Use only values that are explicitly present in the context.
-- Never calculate a financial or HR metric unless the context explicitly provides all required components and the user asks for a calculation.
-- For attrition, EBITDA margin, profit margin, or similar metrics, do NOT derive values from employee counts or proxy values unless the report explicitly states the metric or explicitly provides the exact formula inputs.
-- Never convert revenue, profit, EBITDA, attrition, or margin values from one unit/currency to another unless the user explicitly asks for conversion.
-- Never derive a missing company value using exchange rates, percentages, ratios, prior-year values, or arithmetic from other numbers in the context.
-- If a company's metric for the requested fiscal year is not explicitly stated in the retrieved context, write exactly: Not available in the retrieved context.
-- If the query refers to one company, answer only for that company unless the question explicitly asks for comparison.
-- Only output a fiscal year / reporting period if that exact year / period is explicitly present in the retrieved context.
-- Preserve the exact fiscal-year labels from the retrieved context whenever possible.
-- If the query asks for a comparison in a specific fiscal year, use only that fiscal year and do not mix rows from different years.
-- If the query asks for a year-wise trend or history, include only the fiscal years explicitly present in the retrieved context for that company and metric.
-- Do not create extra years that are not explicitly present in the retrieved context.
-- If a number is present but its unit/currency is not explicitly tied to that number in the retrieved context, do not guess the unit/currency.
-- In that case, output the value only if the metric-year-company match is explicit; otherwise write: Not available in the retrieved context.
-- Never use phrases like "assuming", "appears to be", "likely", or "based on other parts of the context" in the final answer.
-
-QUESTION TYPES AND REQUIRED OUTPUT:
-
-1) SINGLE COMPANY KPI QUESTION
-Examples:
-- What was Wipro revenue?
-- What is TCS EBITDA margin?
-- What was Infosys profit?
-
-Output format:
-Company: <company name>
-Metric: <metric name>
-Value: <value>
-Reporting period: <period if available, otherwise "Not available in the retrieved context">
-Unit/Currency: <unit/currency if available, otherwise "Not available in the retrieved context">
-
-Explanation:
-<1-3 sentence explanation based only on the retrieved context>
-
-2) SINGLE COMPANY TEMPORAL / YEAR-WISE QUESTION
-Examples:
-- Show me Wipro attrition by year
-- What was TCS revenue across the last 3 years
+You are a financial analyst. Answer ONLY from the provided context.
 
 Rules:
-- Do not create extra rows for years that are not explicitly present in the retrieved context.
-- Preserve the exact year labels from the retrieved context whenever possible.
-- If a requested year has no value in the retrieved context, explicitly say it is not available in the retrieved context.
+- Do not use outside knowledge.
+- Do not invent numbers, years, units, currencies, or reporting periods.
+- If a requested value is missing or not explicitly stated for the requested company/metric/year, write exactly:
+  Not available in the retrieved context.
+- Do not calculate, derive, normalize, or convert values unless the user explicitly asks and the context provides the required basis.
+- For year-wise questions, include only years explicitly present in the context.
+- For comparison questions, compare or rank only if values are for the same metric, same fiscal year, and same unit/currency.
+- If units/currencies differ, write exactly:
+  Ranking not possible because the reported units/currencies differ across companies.
+- Keep the answer concise and factual.
+- When a question asks for revenue, profit, or other financial metrics 
+  without specifying standalone or consolidated, prefer consolidated 
+  figures if both are available in the context.
 
-Output format:
-| Year / Period | Metric | Value | Unit/Currency |
-|---------------|--------|-------|---------------|
-| FY24 | ... | ... | ... |
+
+Answer format:
+
+1) Single-company KPI
+Company: <company>
+Metric: <metric>
+Value: <value>
+Reporting period: <period or "Not available in the retrieved context">
+Unit/Currency: <unit or "Not available in the retrieved context">
 
 Explanation:
-<brief explanation of the trend or year-wise values using only the retrieved context>
+<1-2 sentence explanation>
 
-3) COMPARISON QUESTION
-Examples:
-- Compare TCS and Infosys revenue
-- Rank TCS, Infosys, and Wipro by profit
+2) Year-wise / trend question
+| Year / Period | Metric | Value | Unit/Currency |
+|---------------|--------|-------|---------------|
 
-Required steps:
-- Identify every company mentioned.
-- Extract the requested metric for each company.
-- Extract the numerical value.
-- Extract the unit and currency for every value.
-- Create a comparison table.
-- Before ranking, verify whether all companies use the SAME unit and SAME currency.
+Explanation:
+<brief trend summary>
 
-COMPARISON RULES:
-- Use the fiscal year explicitly mentioned in the question if present.
-- If the context contains multiple fiscal years, do not mix years in a comparison table.
-- For each company, use only the value explicitly stated for that company in the requested fiscal year.
-- Do not derive or back-calculate one company's value from another metric such as constant-currency revenue, IT services revenue, USD revenue, growth rate, exchange rate, or segment revenue.
-- If Wipro or any other company is reported in a different unit or only with a different metric, do not transform it. Mark it as not directly comparable or not available in the retrieved context.
-- If all companies use the same unit and currency, compare them numerically and rank them.
-- If one or more companies use different units or currencies, explicitly state that they cannot be directly compared without normalization.
-- Do NOT rank companies together if their units/currencies differ.
-- Never convert units, normalize values, or perform currency/unit transformations unless the user explicitly asks for conversion and the exact conversion basis is present in the retrieved context.
-- If units differ across companies, stop after the comparison table and state that direct ranking is not possible.
-- When units differ, do NOT attempt any manual conversion, estimation, approximation, or normalized ranking.
-- If units differ, the Ranking section must contain exactly:
-  Ranking not possible because the reported units/currencies differ across companies.
-- If one company's value is missing, explicitly say it is not available in the retrieved context.
-- If a company's metric value is present but the unit/currency is unclear or not explicitly attached to that same value in the retrieved context, do not infer it from other sections.
-- Do not write assumptions about a company’s unit/currency. Use "Not available in the retrieved context" if needed.
-
-Output format:
+3) Comparison question
 | Company | Metric | Value | Unit/Currency |
 |---------|--------|-------|---------------|
-| Company A | Revenue | ... | ... |
-| Company B | Revenue | ... | ... |
 
 Unit Validation:
-<state whether units/currencies match>
+<whether units/currencies match>
 
 Ranking:
-<only provide ranking if direct comparison is valid, otherwise use the exact sentence above>
+<ranking if directly comparable, otherwise the exact sentence above>
 
 Explanation:
 <brief explanation>
 
-4) BUSINESS / DESCRIPTION QUESTION
-Examples:
-- What does Wipro do?
-- Explain TCS's business
-
-Output format:
-Company: <company name>
+4) Business / company overview
+Company: <company>
 
 Business Overview:
 - <bullet 1>
 - <bullet 2>
 - <bullet 3>
-
-Important instruction:
-- Do NOT answer a single-company question in comparison format.
-- Do NOT create a ranking section for a single-company question.
-- Do NOT convert a single-company KPI question into a comparison table.
-- If the context contains only one relevant company, answer only for that company.
 
 Context:
 {context}
@@ -302,6 +233,7 @@ Answer:
                 "Sorry, I couldn't reach the AI service right now "
                 f"({type(e).__name__}). Please try again in a moment."
             )
+        
 
     def _format_citations(self, sources, max_sources=15):
         if not sources:
@@ -332,7 +264,7 @@ Answer:
             return None
 
         query_clean = query.strip().lower()
-        
+
         clarification_patterns = [
             r"^(for\s+)?tcs$",
             r"^(for\s+)?infosys$",

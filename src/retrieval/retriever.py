@@ -14,8 +14,17 @@ class Retriever:
         self.documents = all_data["documents"]
         self.metadata = all_data["metadatas"]
 
-        self.doc_to_metadata = dict(zip(self.documents, self.metadata))
-        self.bm25 = BM25Retriever(self.documents)
+        self.records = []
+        for idx, (doc, meta) in enumerate(zip(self.documents, self.metadata)):
+            self.records.append(
+                {
+                    "doc_id": idx,
+                    "text": doc,
+                    "metadata": meta or {}
+                }
+            )
+
+        self.bm25 = BM25Retriever([record["text"] for record in self.records])
 
     def _matches_filters(self, meta, filters):
         if not filters:
@@ -47,6 +56,12 @@ class Retriever:
             if meta_quarter not in quarters:
                 return False
 
+        source_kinds = [s.lower() for s in filters.get("source_kinds", [])]
+        if source_kinds:
+            meta_source_kind = str(meta.get("source_kind", "")).lower()
+            if meta_source_kind not in source_kinds:
+                return False
+
         return True
 
     def _filter_docs_and_metadata(self, docs, metadata, filters):
@@ -64,21 +79,31 @@ class Retriever:
         return filtered_docs, filtered_metadata
 
     def _get_filtered_bm25_docs(self, query, top_k, filters):
-        bm25_pool = self.bm25.search(query, top_k=max(top_k * 4, 20))
+        bm25_indices = self.bm25.search(query, top_k=max(top_k * 4, 20))
 
-        filtered = []
-        for doc in bm25_pool:
-            meta = self.doc_to_metadata.get(doc, {})
+        filtered_docs = []
+        filtered_metadata = []
+
+        for idx in bm25_indices:
+            record = self.records[idx]
+            doc = record["text"]
+            meta = record["metadata"]
+
             if self._matches_filters(meta, filters):
-                filtered.append(doc)
+                filtered_docs.append(doc)
+                filtered_metadata.append(meta)
 
-        return filtered[:top_k]
+            if len(filtered_docs) >= top_k:
+                break
+
+        return filtered_docs, filtered_metadata
 
     def _reciprocal_rank_fusion(
         self,
         vector_docs,
         vector_metadata,
         bm25_docs,
+        bm25_metadata,
         n_results
     ):
         scores = {}
@@ -95,7 +120,15 @@ class Retriever:
             reverse=True
         )
 
-        vector_meta_lookup = dict(zip(vector_docs, vector_metadata))
+        vector_meta_lookup = {}
+        for doc, meta in zip(vector_docs, vector_metadata):
+            if doc not in vector_meta_lookup:
+                vector_meta_lookup[doc] = meta
+
+        bm25_meta_lookup = {}
+        for doc, meta in zip(bm25_docs, bm25_metadata):
+            if doc not in bm25_meta_lookup:
+                bm25_meta_lookup[doc] = meta
 
         fused_docs = []
         fused_metadata = []
@@ -103,8 +136,8 @@ class Retriever:
         for doc, _ in ranked_docs[:n_results]:
             if doc in vector_meta_lookup:
                 meta = vector_meta_lookup[doc]
-            elif doc in self.doc_to_metadata:
-                meta = self.doc_to_metadata[doc]
+            elif doc in bm25_meta_lookup:
+                meta = bm25_meta_lookup[doc]
             else:
                 meta = {}
 
@@ -124,15 +157,16 @@ class Retriever:
             include=["documents", "metadatas", "distances"]
         )
 
-        if vector_results["documents"]:
-            vector_docs = vector_results["documents"][0]
-        else:
-            vector_docs = []
-
-        if vector_results["metadatas"]:
-            vector_metadata = vector_results["metadatas"][0]
-        else:
-            vector_metadata = []
+        vector_docs = (
+            vector_results["documents"][0]
+            if vector_results["documents"]
+            else []
+        )
+        vector_metadata = (
+            vector_results["metadatas"][0]
+            if vector_results["metadatas"]
+            else []
+        )
 
         vector_docs, vector_metadata = self._filter_docs_and_metadata(
             vector_docs,
@@ -143,7 +177,7 @@ class Retriever:
         vector_docs = vector_docs[:n_results]
         vector_metadata = vector_metadata[:n_results]
 
-        bm25_docs = self._get_filtered_bm25_docs(
+        bm25_docs, bm25_metadata = self._get_filtered_bm25_docs(
             query=query,
             top_k=n_results,
             filters=filters
@@ -153,6 +187,7 @@ class Retriever:
             vector_docs,
             vector_metadata,
             bm25_docs,
+            bm25_metadata,
             n_results
         )
 

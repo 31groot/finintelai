@@ -40,10 +40,7 @@ class RAGPipeline:
 
         fy_matches = re.findall(r"\bfy[\s_-]?(\d{2,4})\b", text_lower)
         for year in fy_matches:
-            if len(year) == 2:
-                fiscal_years.add(f"FY{year}")
-            else:
-                fiscal_years.add(f"FY{year[-2:]}")
+            fiscal_years.add(f"FY{year[-2:]}")
 
         fiscal_matches = re.findall(r"\bfiscal[\s_-]?(\d{4})\b", text_lower)
         for year in fiscal_matches:
@@ -53,6 +50,148 @@ class RAGPipeline:
             return int(fy[-2:])
 
         return sorted(fiscal_years, key=fy_key, reverse=True)
+
+    def _extract_quarters(self, text):
+        text_lower = text.lower()
+        found = []
+
+        quarter_patterns = {
+            "Q1": [
+                r"\bq1\b",
+                r"\bq\s*1\b",
+                r"\bquarter\s*1\b",
+                r"\bfirst quarter\b",
+            ],
+            "Q2": [
+                r"\bq2\b",
+                r"\bq\s*2\b",
+                r"\bquarter\s*2\b",
+                r"\bsecond quarter\b",
+            ],
+            "Q3": [
+                r"\bq3\b",
+                r"\bq\s*3\b",
+                r"\bquarter\s*3\b",
+                r"\bthird quarter\b",
+            ],
+            "Q4": [
+                r"\bq4\b",
+                r"\bq\s*4\b",
+                r"\bquarter\s*4\b",
+                r"\bfourth quarter\b",
+            ],
+        }
+
+        for quarter, patterns in quarter_patterns.items():
+            if any(re.search(pattern, text_lower) for pattern in patterns):
+                found.append(quarter)
+
+        return found
+
+    def _infer_doc_types_from_query(self, query: str):
+        q = query.lower()
+
+    
+        quarterly_signals = [
+            "q1", "q2", "q3", "q4",
+            "quarter 1", "quarter 2", "quarter 3", "quarter 4",
+            "earnings call", "conference call", "transcript",
+            "investor presentation", "presentation"
+        ]
+
+        commentary_keywords = [
+            "management",
+            "commentary",
+            "said",
+            "saying",
+            "call transcript",
+            "outlook",
+            "why",
+            "demand",
+            "macro",
+            "press conference"
+        ]
+
+        metric_keywords = [
+            "margin",
+            "revenue",
+            "growth",
+            "attrition",
+            "headcount",
+            "employee",
+            "employees",
+            "tcv",
+            "cash flow",
+            "free cash flow",
+            "client",
+            "geography",
+            "segment",
+            "vertical",
+            "deal",
+            "deals",
+            "guidance",
+            "operating margin"
+        ]
+
+        if any(signal in q for signal in quarterly_signals):
+            if any(keyword in q for keyword in commentary_keywords):
+                return ["quarterly_transcript", "annual_report"]
+            if any(keyword in q for keyword in metric_keywords):
+                return ["quarterly_presentation", "annual_report"]
+            return ["quarterly_presentation", "quarterly_transcript", "annual_report"]
+
+        return None
+
+    def _infer_source_kinds_from_query(self, query: str):
+        q = query.lower()
+
+        commentary_keywords = [
+            "management",
+            "commentary",
+            "said",
+            "saying",
+            "conference call",
+            "call transcript",
+            "transcript",
+            "outlook",
+            "why",
+            "demand",
+            "macro",
+            "hiring",
+            "ai",
+            "genai",
+            "pipeline",
+            "pricing"
+        ]
+
+        metric_keywords = [
+            "margin",
+            "revenue",
+            "growth",
+            "attrition",
+            "headcount",
+            "employee",
+            "employees",
+            "tcv",
+            "cash flow",
+            "free cash flow",
+            "client",
+            "geography",
+            "segment",
+            "vertical",
+            "deal",
+            "deals",
+            "guidance",
+            "operating margin"
+        ]
+
+        if any(keyword in q for keyword in commentary_keywords):
+            return ["management_commentary"]
+
+        if any(keyword in q for keyword in metric_keywords):
+            return ["metrics_summary", "annual_filing"]
+
+        return None
 
     def _is_comparison_query(self, query: str) -> bool:
         query_lower = query.lower()
@@ -68,13 +207,25 @@ class RAGPipeline:
         if companies:
             filters["companies"] = companies
 
-
         fiscal_years = self._extract_fiscal_years(subquery)
         if not fiscal_years:
             fiscal_years = self._extract_fiscal_years(query)
-
         if fiscal_years:
             filters["fiscal_years"] = fiscal_years
+
+        quarters = self._extract_quarters(subquery)
+        if not quarters:
+            quarters = self._extract_quarters(query)
+        if quarters:
+            filters["quarters"] = quarters
+
+        doc_types = self._infer_doc_types_from_query(subquery)
+        if doc_types:
+            filters["doc_types"] = doc_types
+
+        source_kinds = self._infer_source_kinds_from_query(subquery)
+        if source_kinds:
+            filters["source_kinds"] = source_kinds
 
         return filters
 
@@ -87,6 +238,9 @@ class RAGPipeline:
 
         company_filters = [c.lower() for c in filters.get("companies", [])]
         fy_filters = [fy.upper() for fy in filters.get("fiscal_years", [])]
+        doc_type_filters = [d.lower() for d in filters.get("doc_types", [])]
+        quarter_filters = [q.upper() for q in filters.get("quarters", [])]
+        source_kind_filters = [s.lower() for s in filters.get("source_kinds", [])]
 
         for doc, meta in zip(docs, metadata):
             meta = meta or {}
@@ -106,6 +260,21 @@ class RAGPipeline:
             if keep and fy_filters:
                 meta_fy = str(meta.get("fiscal_year", "")).upper()
                 if meta_fy not in fy_filters:
+                    keep = False
+
+            if keep and doc_type_filters:
+                meta_doc_type = str(meta.get("doc_type", "")).lower()
+                if meta_doc_type not in doc_type_filters:
+                    keep = False
+
+            if keep and quarter_filters:
+                meta_quarter = str(meta.get("quarter", "")).upper()
+                if meta_quarter not in quarter_filters:
+                    keep = False
+
+            if keep and source_kind_filters:
+                meta_source_kind = str(meta.get("source_kind", "")).lower()
+                if meta_source_kind not in source_kind_filters:
                     keep = False
 
             if keep:
@@ -129,11 +298,9 @@ class RAGPipeline:
 
     def _get_rerank_top_k(self, is_comparison: bool, num_subqueries: int) -> int:
         if is_comparison:
-            if num_subqueries == 1:
-                return 20
-            if num_subqueries == 2:
+            if num_subqueries <= 2:
                 return 12
-            if num_subqueries == 3:
+            if num_subqueries <= 4:
                 return 8
             return 6
 
@@ -144,6 +311,29 @@ class RAGPipeline:
         if num_subqueries == 3:
             return 5
         return 4
+
+    def _relax_filters_stepwise(self, docs, metadata, filters):
+        # Step 1: original strict filters
+        strict_docs, strict_meta = self._apply_local_filters(docs, metadata, filters)
+        if strict_docs:
+            return strict_docs, strict_meta
+
+        relaxed = dict(filters)
+        relaxed.pop("source_kinds", None)
+        relaxed.pop("doc_types", None)
+
+        relaxed_docs, relaxed_meta = self._apply_local_filters(docs, metadata, relaxed)
+        if relaxed_docs:
+            return relaxed_docs, relaxed_meta
+
+        relaxed2 = dict(relaxed)
+        relaxed2.pop("quarters", None)
+
+        relaxed_docs2, relaxed_meta2 = self._apply_local_filters(docs, metadata, relaxed2)
+        if relaxed_docs2:
+            return relaxed_docs2, relaxed_meta2
+
+        return [], []
 
     def get_context(self, query, memory_companies=None):
         subqueries = self.decomposer.decompose(
@@ -177,11 +367,12 @@ class RAGPipeline:
                 retrieved_metadata
             )
 
-            docs, metadata = self._apply_local_filters(
+            docs, metadata = self._relax_filters_stepwise(
                 docs,
                 metadata,
                 filters
             )
+
             has_strict_year_filter = bool(filters.get("fiscal_years"))
 
             if not docs and not has_strict_year_filter:
