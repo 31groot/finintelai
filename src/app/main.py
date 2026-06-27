@@ -16,24 +16,24 @@ company_aliases = {
 }
 
 doc_type_patterns = {
-    "annual_report": [
-        "annual_report",
-        "annualreport",
-        "annual-report",
-        "ar",
+    "investor_presentation": [
+        "investor_presentation",
+        "investorpresentation",
+        "quarterly_presentation",
+        "presentation",
+        "ppt",
     ],
     "earnings_call": [
         "earnings_call",
         "earningscall",
         "earnings-call",
+        "quarterly_transcript",
         "transcript",
-        "call",
     ],
-    "investor_presentation": [
-        "presentation",
-        "investor_presentation",
-        "investorpresentation",
-        "ppt",
+    "annual_report": [
+        "annual_report",
+        "annualreport",
+        "annual-report",
     ],
 }
 
@@ -104,7 +104,7 @@ def infer_quarter_from_source(source_name: str):
     return None
 
 
-def infer_statement_type(page_text: str) -> str:
+def infer_statement_type(page_text: str):
     text_lower = page_text.lower()
 
     for marker in CONSOLIDATED_MARKERS:
@@ -118,22 +118,65 @@ def infer_statement_type(page_text: str) -> str:
     return "general"
 
 
+def infer_source_kind(doc_type: str):
+    if doc_type == "annual_report":
+        return "annual_filing"
+    if doc_type == "investor_presentation":
+        return "metrics_summary"
+    if doc_type == "earnings_call":
+        return "management_commentary"
+    return "general"
+
+
 def parse_source_metadata(source_name: str):
+    doc_type = infer_doc_type_from_source(source_name)
+
     return {
         "source": source_name,
         "company": infer_company_from_source(source_name),
-        "doc_type": infer_doc_type_from_source(source_name),
+        "doc_type": doc_type,
+        "source_kind": infer_source_kind(doc_type),
         "fiscal_year": infer_fiscal_year_from_source(source_name),
         "quarter": infer_quarter_from_source(source_name),
         "report_date": None,
     }
 
 
-def build_chunk_metadata(source_meta, page=None, chunk_type="text", extra=None, page_text=""):
+def build_source_id(source_meta):
+    company = source_meta.get("company") or ""
+    fiscal_year = (source_meta.get("fiscal_year") or "").lower()
+    quarter = (source_meta.get("quarter") or "").lower()
+    doc_type = source_meta.get("doc_type") or ""
+
+    suffix_map = {
+        "annual_report": "annual",
+        "investor_presentation": "presentation",
+        "earnings_call": "transcript",
+    }
+
+    suffix = suffix_map.get(doc_type, doc_type)
+
+    parts = [company, fiscal_year]
+    if quarter:
+        parts.append(quarter)
+    if suffix:
+        parts.append(suffix)
+
+    return "_".join([p for p in parts if p])
+
+
+def build_chunk_metadata(
+    source_meta,
+    page=None,
+    chunk_type="text",
+    extra=None,
+    page_text=""
+):
     metadata = {
         "source": source_meta.get("source") or "",
         "company": source_meta.get("company") or "",
         "doc_type": source_meta.get("doc_type") or "",
+        "source_kind": source_meta.get("source_kind") or "",
         "fiscal_year": source_meta.get("fiscal_year") or "",
         "quarter": source_meta.get("quarter") or "",
         "report_date": source_meta.get("report_date") or "",
@@ -144,10 +187,7 @@ def build_chunk_metadata(source_meta, page=None, chunk_type="text", extra=None, 
 
     if extra:
         for key, value in extra.items():
-            if value is None:
-                metadata[key] = ""
-            else:
-                metadata[key] = value
+            metadata[key] = "" if value is None else value
 
     return metadata
 
@@ -168,7 +208,7 @@ def normalize_table_metadata(table_metadata_list, source_meta):
                 source_meta=source_meta,
                 page=page,
                 chunk_type="table",
-                extra=extra
+                extra=extra,
             )
         )
 
@@ -186,11 +226,12 @@ def main():
     all_metadata = []
 
     for pdf_path in pdf_files:
-        source_name = pdf_path.stem
+        source_name = str(pdf_path).replace("\\", "/")
         source_meta = parse_source_metadata(source_name)
+        source_meta["source"] = build_source_id(source_meta)
 
         print("\n" + "=" * 60)
-        print(f"Processing: {source_name}")
+        print(f"Processing: {pdf_path.stem}")
         print(f"Parsed source metadata: {source_meta}")
 
         print("Loading PDF pages...")
@@ -203,7 +244,7 @@ def main():
             page_num = page_data["page"]
             page_text = page_data["text"]
 
-            chunks = chunk_page(page_text)
+            chunks = chunk_page(page_text, doc_type=source_meta["doc_type"])
 
             for chunk in chunks:
                 text_chunks.append(chunk)
@@ -212,7 +253,7 @@ def main():
                         source_meta=source_meta,
                         page=page_num,
                         chunk_type="text",
-                        page_text=page_text
+                        page_text=page_text,
                     )
                 )
 
@@ -222,7 +263,7 @@ def main():
         tables = extract_tables(str(pdf_path))
         print(f"Tables found: {len(tables)}")
 
-        table_chunks, table_metadata = chunk_tables(tables, source_name)
+        table_chunks, table_metadata = chunk_tables(tables, source_meta["source"])
         table_metadata = normalize_table_metadata(table_metadata, source_meta)
 
         print(f"Table chunks: {len(table_chunks)}")

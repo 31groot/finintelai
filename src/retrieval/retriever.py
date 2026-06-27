@@ -20,7 +20,7 @@ class Retriever:
                 {
                     "doc_id": idx,
                     "text": doc,
-                    "metadata": meta or {}
+                    "metadata": meta or {},
                 }
             )
 
@@ -55,11 +55,18 @@ class Retriever:
             meta_quarter = str(meta.get("quarter", "")).upper()
             if meta_quarter not in quarters:
                 return False
+            
 
         source_kinds = [s.lower() for s in filters.get("source_kinds", [])]
         if source_kinds:
             meta_source_kind = str(meta.get("source_kind", "")).lower()
             if meta_source_kind not in source_kinds:
+                return False
+
+        statement_type = str(filters.get("statement_type", "")).lower().strip()
+        if statement_type:
+            meta_statement_type = str(meta.get("statement_type", "")).lower().strip()
+            if meta_statement_type != statement_type:
                 return False
 
         return True
@@ -79,7 +86,7 @@ class Retriever:
         return filtered_docs, filtered_metadata
 
     def _get_filtered_bm25_docs(self, query, top_k, filters):
-        bm25_indices = self.bm25.search(query, top_k=max(top_k * 4, 20))
+        bm25_indices = self.bm25.search(query, top_k=max(top_k * 20, 300))
 
         filtered_docs = []
         filtered_metadata = []
@@ -104,7 +111,7 @@ class Retriever:
         vector_metadata,
         bm25_docs,
         bm25_metadata,
-        n_results
+        n_results,
     ):
         scores = {}
 
@@ -114,11 +121,7 @@ class Retriever:
         for rank, doc in enumerate(bm25_docs, start=1):
             scores[doc] = scores.get(doc, 0) + 1 / (rank + RRF_K)
 
-        ranked_docs = sorted(
-            scores.items(),
-            key=lambda x: x[1],
-            reverse=True
-        )
+        ranked_docs = sorted(scores.items(), key=lambda x: x[1], reverse=True)
 
         vector_meta_lookup = {}
         for doc, meta in zip(vector_docs, vector_metadata):
@@ -146,15 +149,18 @@ class Retriever:
 
         return fused_docs, fused_metadata
 
-    def search(self, query, n_results, filters=None):
+    def _search_once(self, query, n_results, filters=None):
         query_embedding = self.embedder.embed([query])
 
-        vector_pool_size = max(n_results * 3, 20) if filters else n_results
+        if filters:
+            vector_pool_size = max(n_results * 20, 300)
+        else:
+            vector_pool_size = n_results
 
         vector_results = self.store.collection.query(
             query_embeddings=query_embedding.tolist(),
             n_results=vector_pool_size,
-            include=["documents", "metadatas", "distances"]
+            include=["documents", "metadatas", "distances"],
         )
 
         vector_docs = (
@@ -171,7 +177,7 @@ class Retriever:
         vector_docs, vector_metadata = self._filter_docs_and_metadata(
             vector_docs,
             vector_metadata,
-            filters
+            filters,
         )
 
         vector_docs = vector_docs[:n_results]
@@ -180,7 +186,7 @@ class Retriever:
         bm25_docs, bm25_metadata = self._get_filtered_bm25_docs(
             query=query,
             top_k=n_results,
-            filters=filters
+            filters=filters,
         )
 
         fused_docs, fused_metadata = self._reciprocal_rank_fusion(
@@ -188,10 +194,31 @@ class Retriever:
             vector_metadata,
             bm25_docs,
             bm25_metadata,
-            n_results
+            n_results,
         )
 
         return {
             "documents": fused_docs,
-            "metadata": fused_metadata
+            "metadata": fused_metadata,
         }
+
+    def search(self, query, n_results, filters=None):
+        result = self._search_once(query=query, n_results=n_results, filters=filters)
+
+        if result["documents"]:
+            return result
+
+        if filters and filters.get("statement_type"):
+            relaxed_filters = dict(filters)
+            relaxed_filters.pop("statement_type", None)
+
+            relaxed_result = self._search_once(
+                query=query,
+                n_results=n_results,
+                filters=relaxed_filters,
+            )
+
+            if relaxed_result["documents"]:
+                return relaxed_result
+
+        return result

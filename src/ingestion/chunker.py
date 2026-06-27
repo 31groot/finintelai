@@ -4,14 +4,14 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 def get_splitter(doc_type: str = "general"):
     doc_type = (doc_type or "general").lower()
 
-    if doc_type == "quarterly_transcript":
+    if doc_type == "earnings_call":
         return RecursiveCharacterTextSplitter(
             chunk_size=1800,
             chunk_overlap=300,
             separators=["\n\n", "\n", ". ", " ", ""]
         )
 
-    if doc_type == "quarterly_presentation":
+    if doc_type == "investor_presentation":
         return RecursiveCharacterTextSplitter(
             chunk_size=1100,
             chunk_overlap=150,

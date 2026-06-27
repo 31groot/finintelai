@@ -1,8 +1,8 @@
 import re
 
-from src.retrieval.retriever import Retriever
-from src.retrieval.reranker import Reranker
 from src.retrieval.query_decomposer import QueryDecomposer
+from src.retrieval.reranker import Reranker
+from src.retrieval.retriever import Retriever
 
 
 compare_keywords = [
@@ -18,8 +18,57 @@ compare_keywords = [
     "vs",
 ]
 
+metric_keywords = [
+    "revenue",
+    "profit",
+    "ebitda",
+    "margin",
+    "attrition",
+    "headcount",
+    "employees",
+    "employee",
+    "tcv",
+    "guidance",
+    "deal",
+    "deals",
+    "growth",
+]
+
+commentary_keywords = [
+            "management",
+            "commentary",
+            "said",
+            "saying",
+            "call transcript",
+            "transcript",
+            "conference call",
+            "earnings call",
+]
+
+metric_keywords_local = [
+            "margin",
+            "revenue",
+            "growth",
+            "attrition",
+            "headcount",
+            "employee",
+            "employees",
+            "cash flow",
+            "free cash flow",
+            "client",
+            "geography",
+            "segment",
+            "vertical",
+            "deal",
+            "deals",
+            "guidance",
+            "operating margin",
+            "profit",
+            "ebitda",
+        ]
 
 class RAGPipeline:
+            
     def __init__(self):
         self.retriever = Retriever()
         self.reranker = Reranker()
@@ -56,30 +105,10 @@ class RAGPipeline:
         found = []
 
         quarter_patterns = {
-            "Q1": [
-                r"\bq1\b",
-                r"\bq\s*1\b",
-                r"\bquarter\s*1\b",
-                r"\bfirst quarter\b",
-            ],
-            "Q2": [
-                r"\bq2\b",
-                r"\bq\s*2\b",
-                r"\bquarter\s*2\b",
-                r"\bsecond quarter\b",
-            ],
-            "Q3": [
-                r"\bq3\b",
-                r"\bq\s*3\b",
-                r"\bquarter\s*3\b",
-                r"\bthird quarter\b",
-            ],
-            "Q4": [
-                r"\bq4\b",
-                r"\bq\s*4\b",
-                r"\bquarter\s*4\b",
-                r"\bfourth quarter\b",
-            ],
+            "Q1": [r"\bq1\b", r"\bq\s*1\b", r"\bquarter\s*1\b", r"\bfirst quarter\b"],
+            "Q2": [r"\bq2\b", r"\bq\s*2\b", r"\bquarter\s*2\b", r"\bsecond quarter\b"],
+            "Q3": [r"\bq3\b", r"\bq\s*3\b", r"\bquarter\s*3\b", r"\bthird quarter\b"],
+            "Q4": [r"\bq4\b", r"\bq\s*4\b", r"\bquarter\s*4\b", r"\bfourth quarter\b"],
         }
 
         for quarter, patterns in quarter_patterns.items():
@@ -88,121 +117,123 @@ class RAGPipeline:
 
         return found
 
-    def _infer_doc_types_from_query(self, query: str):
+    def _infer_doc_types_from_query(self, query):
         q = query.lower()
 
-    
+
+
+        quarterly_signals = [
+            "q1",
+            "q2",
+            "q3",
+            "q4",
+            "quarter 1",
+            "quarter 2",
+            "quarter 3",
+            "quarter 4",
+            "earnings call",
+            "conference call",
+            "transcript",
+            "investor presentation",
+            "presentation",
+        ]
+
+        if any(keyword in q for keyword in commentary_keywords):
+            return ["earnings_call", "annual_report"]
+
+        if any(keyword in q for keyword in metric_keywords_local):
+            if any(signal in q for signal in quarterly_signals):
+                return ["investor_presentation", "earnings_call", "annual_report"]
+            return ["annual_report", "investor_presentation"]
+
+        if any(signal in q for signal in quarterly_signals):
+            if any(keyword in q for keyword in commentary_keywords):
+                return ["earnings_call", "annual_report"]
+            if any(keyword in q for keyword in metric_keywords_local):
+                return ["investor_presentation", "annual_report"]
+            return ["investor_presentation", "earnings_call", "annual_report"]
+
+        return None
+
+    def _infer_source_kinds_from_query(self, query):
+        q = query.lower()
+
         quarterly_signals = [
             "q1", "q2", "q3", "q4",
             "quarter 1", "quarter 2", "quarter 3", "quarter 4",
             "earnings call", "conference call", "transcript",
-            "investor presentation", "presentation"
+            "investor presentation", "presentation",
         ]
-
-        commentary_keywords = [
-            "management",
-            "commentary",
-            "said",
-            "saying",
-            "call transcript",
-            "outlook",
-            "why",
-            "demand",
-            "macro",
-            "press conference"
-        ]
-
-        metric_keywords = [
-            "margin",
-            "revenue",
-            "growth",
-            "attrition",
-            "headcount",
-            "employee",
-            "employees",
-            "tcv",
-            "cash flow",
-            "free cash flow",
-            "client",
-            "geography",
-            "segment",
-            "vertical",
-            "deal",
-            "deals",
-            "guidance",
-            "operating margin"
-        ]
-
-        if any(signal in q for signal in quarterly_signals):
-            if any(keyword in q for keyword in commentary_keywords):
-                return ["quarterly_transcript", "annual_report"]
-            if any(keyword in q for keyword in metric_keywords):
-                return ["quarterly_presentation", "annual_report"]
-            return ["quarterly_presentation", "quarterly_transcript", "annual_report"]
-
-        return None
-
-    def _infer_source_kinds_from_query(self, query: str):
-        q = query.lower()
-
-        commentary_keywords = [
-            "management",
-            "commentary",
-            "said",
-            "saying",
-            "conference call",
-            "call transcript",
-            "transcript",
-            "outlook",
-            "why",
-            "demand",
-            "macro",
-            "hiring",
-            "ai",
-            "genai",
-            "pipeline",
-            "pricing"
-        ]
-
-        metric_keywords = [
-            "margin",
-            "revenue",
-            "growth",
-            "attrition",
-            "headcount",
-            "employee",
-            "employees",
-            "tcv",
-            "cash flow",
-            "free cash flow",
-            "client",
-            "geography",
-            "segment",
-            "vertical",
-            "deal",
-            "deals",
-            "guidance",
-            "operating margin"
-        ]
+        has_quarter_signal = any(signal in q for signal in quarterly_signals)
 
         if any(keyword in q for keyword in commentary_keywords):
             return ["management_commentary"]
 
-        if any(keyword in q for keyword in metric_keywords):
-            return ["metrics_summary", "annual_filing"]
+        # Quarterly data lives in investor_presentation / earnings_call, never in
+        # annual_filing. Skip source_kind pinning so we don't filter out all chunks.
+        if has_quarter_signal:
+            return None
+
+        if any(keyword in q for keyword in metric_keywords_local):
+            return ["annual_filing", "metrics_summary"]
 
         return None
 
-    def _is_comparison_query(self, query: str) -> bool:
+    def _extract_statement_type(self, query):
+        q = query.lower()
+
+        if "standalone" in q:
+            return "standalone"
+
+        if "consolidated" in q:
+            return "consolidated"
+
+        return None
+
+    def _is_comparison_query(self, query):
         query_lower = query.lower()
         return any(keyword in query_lower for keyword in compare_keywords)
 
-    def _build_filters_for_subquery(self, query, subquery, memory_companies=None):
+    def _extract_metrics_from_query(self, query):
+        q = query.lower()
+        found = []
+
+        for metric in metric_keywords:
+            if metric in q:
+                found.append(metric)
+
+        return found
+
+    def _is_financial_kpi_query(self, query, subqueries):
+        companies = self.decomposer._find_companies(query.lower())
+        metrics = self._extract_metrics_from_query(query)
+        fiscal_years = self._extract_fiscal_years(query)
+        is_comparison = self._is_comparison_query(query)
+
+        if is_comparison:
+            return False
+
+        if len(subqueries) != 1:
+            return False
+
+        if len(companies) != 1:
+            return False
+
+        if not metrics:
+            return False
+
+        if not fiscal_years:
+            return False
+
+        return True
+
+    def _build_filters_for_subquery(
+        self, query, subquery, memory_companies=None, statement_type=None
+    ):
         filters = {}
 
         companies = self._get_companies_for_subquery(
-            subquery,
-            fallback_companies=memory_companies
+            subquery, fallback_companies=memory_companies
         )
         if companies:
             filters["companies"] = companies
@@ -220,12 +251,19 @@ class RAGPipeline:
             filters["quarters"] = quarters
 
         doc_types = self._infer_doc_types_from_query(subquery)
+        if not doc_types:
+            doc_types = self._infer_doc_types_from_query(query)
         if doc_types:
             filters["doc_types"] = doc_types
 
         source_kinds = self._infer_source_kinds_from_query(subquery)
+        if not source_kinds:
+            source_kinds = self._infer_source_kinds_from_query(query)
         if source_kinds:
             filters["source_kinds"] = source_kinds
+
+        if statement_type and not filters.get("quarters"):
+            filters["statement_type"] = statement_type
 
         return filters
 
@@ -241,6 +279,7 @@ class RAGPipeline:
         doc_type_filters = [d.lower() for d in filters.get("doc_types", [])]
         quarter_filters = [q.upper() for q in filters.get("quarters", [])]
         source_kind_filters = [s.lower() for s in filters.get("source_kinds", [])]
+        statement_type_filter = str(filters.get("statement_type", "")).lower().strip()
 
         for doc, meta in zip(docs, metadata):
             meta = meta or {}
@@ -274,7 +313,14 @@ class RAGPipeline:
 
             if keep and source_kind_filters:
                 meta_source_kind = str(meta.get("source_kind", "")).lower()
-                if meta_source_kind not in source_kind_filters:
+                if meta_source_kind and meta_source_kind not in source_kind_filters:
+                    keep = False
+
+            if keep and statement_type_filter:
+                meta_statement_type = (
+                    str(meta.get("statement_type", "")).lower().strip()
+                )
+                if meta_statement_type != statement_type_filter:
                     keep = False
 
             if keep:
@@ -296,52 +342,193 @@ class RAGPipeline:
 
         return unique_docs, unique_metadata
 
-    def _get_rerank_top_k(self, is_comparison: bool, num_subqueries: int) -> int:
+    def _get_rerank_top_k(self, is_comparison, num_subqueries):
         if is_comparison:
             if num_subqueries <= 2:
-                return 12
+                return 10
             if num_subqueries <= 4:
                 return 8
             return 6
 
         if num_subqueries == 1:
-            return 15
+            return 12
         if num_subqueries == 2:
-            return 8
+            return 10
         if num_subqueries == 3:
-            return 5
-        return 4
+            return 8
+        return 6
 
     def _relax_filters_stepwise(self, docs, metadata, filters):
-        # Step 1: original strict filters
         strict_docs, strict_meta = self._apply_local_filters(docs, metadata, filters)
         if strict_docs:
             return strict_docs, strict_meta
 
         relaxed = dict(filters)
         relaxed.pop("source_kinds", None)
-        relaxed.pop("doc_types", None)
 
         relaxed_docs, relaxed_meta = self._apply_local_filters(docs, metadata, relaxed)
         if relaxed_docs:
             return relaxed_docs, relaxed_meta
 
         relaxed2 = dict(relaxed)
-        relaxed2.pop("quarters", None)
+        relaxed2.pop("doc_types", None)
 
-        relaxed_docs2, relaxed_meta2 = self._apply_local_filters(docs, metadata, relaxed2)
+        relaxed_docs2, relaxed_meta2 = self._apply_local_filters(
+            docs, metadata, relaxed2
+        )
         if relaxed_docs2:
             return relaxed_docs2, relaxed_meta2
 
+        relaxed3 = dict(relaxed2)
+        relaxed3.pop("quarters", None)
+
+        relaxed_docs3, relaxed_meta3 = self._apply_local_filters(
+            docs, metadata, relaxed3
+        )
+        if relaxed_docs3:
+            return relaxed_docs3, relaxed_meta3
+
+        relaxed4 = dict(relaxed3)
+        relaxed4.pop("statement_type", None)
+
+        relaxed_docs4, relaxed_meta4 = self._apply_local_filters(
+            docs, metadata, relaxed4
+        )
+        if relaxed_docs4:
+            return relaxed_docs4, relaxed_meta4
+
         return [], []
 
+    def _score_financial_chunk(self, doc, meta, query, filters):
+        text = (doc or "").lower()
+        meta = meta or {}
+        score = 0
+
+        metrics = self._extract_metrics_from_query(query)
+        fiscal_years = [fy.upper() for fy in filters.get("fiscal_years", [])]
+        quarters = [q.upper() for q in filters.get("quarters", [])]
+        doc_type = str(meta.get("doc_type", "")).lower()
+        chunk_type = str(meta.get("chunk_type", "")).lower()
+
+        page_raw = meta.get("page", 99999)
+        try:
+            page = int(page_raw)
+        except Exception:
+            page = 99999
+
+        if doc_type == "annual_report":
+            score += 8
+        elif doc_type == "investor_presentation":
+            score += 5
+        elif doc_type == "earnings_call":
+            score -= 4
+
+        if chunk_type == "text":
+            score += 4
+        elif chunk_type == "table":
+            score += 1
+
+        if page <= 120:
+            score += 3
+        elif page <= 200:
+            score += 1
+
+        if "financial results" in text:
+            score += 12
+        if "directors' report" in text or "directors' report" in text:
+            score += 8
+        if "management discussion and analysis" in text:
+            score += 3
+        if "analysis of revenue growth" in text:
+            score += 8
+        if "consolidated performance" in text:
+            score += 6
+        if "consolidated" in text:
+            score += 4
+        if "standalone" in text and "consolidated" not in text:
+            score -= 5
+
+        for metric in metrics:
+            if metric in text:
+                score += 8
+
+        if "revenue from operations" in text:
+            score += 10
+        if "profit after tax" in text:
+            score += 8
+        if "ebitda" in text:
+            score += 8
+        if "operating margin" in text or "margin" in text:
+            score += 5
+
+        for fy in fiscal_years:
+            fy_num = fy[-2:]
+            if fy.lower() in text:
+                score += 5
+            if f"fy 20{fy_num}" in text or f"fy20{fy_num}" in text:
+                score += 4
+
+        for q in quarters:
+            if q.lower() in text:
+                score += 4
+
+        negative_markers = [
+            "related party",
+            "related parties",
+            "trade receivables",
+            "balances payable",
+            "balances receivable",
+            "country of incorporation",
+            "subsidiaries of tata sons",
+            "other related parties",
+            "net assets",
+            "share in profit or loss",
+            "notes forming part of consolidated financial statements",
+            "notes forming part of standalone financial statements",
+            "revenue recognition",
+        ]
+
+        for marker in negative_markers:
+            if marker in text:
+                score -= 8
+
+        if len(text) < 120:
+            score -= 2
+
+        return score
+
+    def _prune_financial_kpi_docs(self, query, docs, metadata, filters, max_docs=6):
+        scored = []
+
+        for doc, meta in zip(docs, metadata):
+            score = self._score_financial_chunk(doc, meta, query, filters)
+            scored.append((score, doc, meta))
+
+        scored.sort(key=lambda x: x[0], reverse=True)
+
+        pruned_docs = []
+        pruned_metadata = []
+
+        for score, doc, meta in scored:
+            if len(pruned_docs) >= max_docs:
+                break
+            pruned_docs.append(doc)
+            pruned_metadata.append(meta)
+
+        return pruned_docs, pruned_metadata
+
     def get_context(self, query, memory_companies=None):
-        subqueries = self.decomposer.decompose(
-            query,
-            memory_companies=memory_companies
-        )
+        decomposed = self.decomposer.decompose(query, memory_companies=memory_companies)
+
+        if isinstance(decomposed, dict):
+            subqueries = decomposed.get("subqueries", [])
+            statement_type = decomposed.get("statement_type")
+        else:
+            subqueries = decomposed
+            statement_type = self._extract_statement_type(query)
 
         is_comparison = self._is_comparison_query(query)
+        is_financial_kpi = self._is_financial_kpi_query(query, subqueries)
 
         balanced_docs = []
         balanced_metadata = []
@@ -350,35 +537,31 @@ class RAGPipeline:
             filters = self._build_filters_for_subquery(
                 query=query,
                 subquery=subquery,
-                memory_companies=memory_companies
+                memory_companies=memory_companies,
+                statement_type=statement_type,
             )
 
             results = self.retriever.search(
-                query=subquery,
-                n_results=22 if is_comparison else 15,
-                filters=filters
+                query=subquery, n_results=24 if is_comparison else 20, filters=filters
             )
 
             retrieved_docs = results["documents"]
             retrieved_metadata = results["metadata"]
 
-            docs, metadata = self._deduplicate_docs(
-                retrieved_docs,
-                retrieved_metadata
+            docs, metadata = self._deduplicate_docs(retrieved_docs, retrieved_metadata)
+
+            docs, metadata = self._relax_filters_stepwise(docs, metadata, filters)
+
+            has_strict_filter = bool(
+                filters.get("fiscal_years")
+                or filters.get("quarters")
+                or filters.get("companies")
+                or filters.get("statement_type")
             )
 
-            docs, metadata = self._relax_filters_stepwise(
-                docs,
-                metadata,
-                filters
-            )
-
-            has_strict_year_filter = bool(filters.get("fiscal_years"))
-
-            if not docs and not has_strict_year_filter:
+            if not docs and not has_strict_filter:
                 docs, metadata = self._deduplicate_docs(
-                    retrieved_docs,
-                    retrieved_metadata
+                    retrieved_docs, retrieved_metadata
                 )
 
             if not docs:
@@ -386,27 +569,54 @@ class RAGPipeline:
 
             rerank_top_k = min(
                 self._get_rerank_top_k(
-                    is_comparison=is_comparison,
-                    num_subqueries=len(subqueries)
+                    is_comparison=is_comparison, num_subqueries=len(subqueries)
                 ),
-                len(docs)
+                len(docs),
             )
 
             top_results = self.reranker.rerank(
-                query=subquery,
-                documents=docs,
-                metadata=metadata,
-                top_k=rerank_top_k
+                query=subquery, documents=docs, metadata=metadata, top_k=rerank_top_k
             )
 
+            reranked_docs = []
+            reranked_metadata = []
+
             for doc, meta, _score in top_results:
+                reranked_docs.append(doc)
+                reranked_metadata.append(meta)
+
+            if is_financial_kpi:
+                reranked_docs, reranked_metadata = self._prune_financial_kpi_docs(
+                    query=query,
+                    docs=reranked_docs,
+                    metadata=reranked_metadata,
+                    filters=filters,
+                    max_docs=8,
+                )
+
+            for doc, meta in zip(reranked_docs, reranked_metadata):
                 balanced_docs.append(doc)
                 balanced_metadata.append(meta)
 
         final_docs, final_metadata = self._deduplicate_docs(
-            balanced_docs,
-            balanced_metadata
+            balanced_docs, balanced_metadata
         )
+
+        if is_financial_kpi:
+            filters = self._build_filters_for_subquery(
+                query=query,
+                subquery=subqueries[0] if subqueries else query,
+                memory_companies=memory_companies,
+                statement_type=statement_type,
+            )
+            final_docs, final_metadata = self._prune_financial_kpi_docs(
+                query=query,
+                docs=final_docs,
+                metadata=final_metadata,
+                filters=filters,
+                max_docs=10,
+            )
+    
 
         context = "\n\n".join(final_docs)
 
@@ -415,5 +625,5 @@ class RAGPipeline:
             "subqueries": subqueries,
             "context": context,
             "documents": final_docs,
-            "metadata": final_metadata
+            "metadata": final_metadata,
         }

@@ -1,6 +1,5 @@
 import re
 
-
 company_aliases = {
     "tcs": [
         "tcs",
@@ -49,14 +48,37 @@ metric_keywords = [
     "ebitda",
     "margin",
     "revenue",
+    "growth",
 ]
 
 metric_retrieval_map = {
     "revenue": "revenue consolidated revenue from operations total income turnover sales consolidated financial statements",
+    "growth": (
+        "revenue growth "
+        "YoY growth "
+        "QoQ growth "
+        "year-on-year growth "
+        "quarter-on-quarter growth "
+        "constant currency growth "
+        "CC growth "
+        "revenue growth percentage"
+    ),
     "profit": "consolidated profit after tax consolidated PAT profit attributable to equity holders consolidated net profit net income consolidated statement of profit and loss",
     "ebitda": "consolidated ebitda earnings before interest tax depreciation amortization consolidated operating profit",
     "attrition": "attrition voluntary attrition employee turnover workforce attrition annual attrition rate",
     "margin": "consolidated margin consolidated operating margin EBITDA margin EBIT margin profit margin consolidated net profit margin",
+}
+
+NARRATIVE_TOPICS = {
+    "guidance": ["guidance", "provide", "forecast", "outlook", "projections", "expected growth"],
+    "outlook": ["outlook", "future outlook", "growth trajectory", "demand environment", "macro environment"],
+    "deal wins": ["deal wins", "deals", "tcv", "large deals", "contract", "contracts", "order book", "wins"],
+}
+
+topic_retrieval_map = {
+    "guidance": "management guidance growth forecast outlook business projections management commentary forward looking expectations",
+    "outlook": "business outlook demand environment growth trajectory macroeconomic commentary executive outlook",
+    "deal wins": "deal wins total contract value TCV large deals mega deals order bookings new contracts won",
 }
 
 temporal_words = [
@@ -88,7 +110,7 @@ temporal_words = [
 
 available_fiscal_years = ["FY26", "FY25", "FY24", "FY23"]
 
-FINANCIAL_METRICS = {"revenue", "profit", "ebitda", "margin"}
+FINANCIAL_METRICS = {"revenue", "profit", "ebitda", "margin", "growth"}
 
 
 class QueryDecomposer:
@@ -97,156 +119,156 @@ class QueryDecomposer:
         query_lower = query.lower()
 
         companies = self._find_companies(query_lower)
-
         if not companies and memory_companies:
-            companies = memory_companies
+            companies = list(memory_companies)
 
         metrics = self._find_metrics(query_lower)
+        topics = self._find_topics(query_lower)
 
-        is_comparison = any(word in query_lower for word in comparison_words)
+        is_comparison = any(word in query_lower for word in comparison_words) or len(companies) > 1
         is_description = any(word in query_lower for word in description_words)
 
         explicit_years = self._extract_explicit_fiscal_years(query_lower)
-        requested_years = self._get_requested_temporal_years(
-            query_lower,
-            explicit_years
-        )
+        requested_years = self._get_requested_temporal_years(query_lower, explicit_years)
+        requested_quarters = self._extract_quarters(query_lower)
 
-        needs_consolidated = bool(metrics & FINANCIAL_METRICS)
+        needs_consolidated = bool(set(metrics) & FINANCIAL_METRICS)
         statement_type_filter = "consolidated" if needs_consolidated else None
 
+        # Build clean chronological/temporal strings
+        time_suffixes = []
+        if requested_years and requested_quarters:
+            for y in requested_years:
+                for q in requested_quarters:
+                    time_suffixes.append(f"{y} {q}")
+        elif requested_years:
+            time_suffixes = list(requested_years)
+        elif requested_quarters:
+            time_suffixes = list(requested_quarters)
+        else:
+            time_suffixes = [""]
+
+        subqueries = []
+
+        # 1. Comparison & Structural Strategy Execution Block
         if companies and is_comparison and metrics:
-            subqueries = []
+            merged_metrics = list(metrics)
+            if "revenue" in merged_metrics and "growth" in merged_metrics:
+                merged_metrics.remove("revenue")
 
             for company in companies:
                 company_text = company_retrieval_map.get(company, company)
-
-                for metric in metrics:
+                for metric in merged_metrics:
                     metric_text = metric_retrieval_map.get(metric, metric)
+                    for time in time_suffixes:
+                        subqueries.append(f"{company_text} {metric_text} {time}".strip())
 
-                    if requested_years:
-                        for fiscal_year in requested_years:
-                            subqueries.append(
-                                f"{company_text} {metric_text} {fiscal_year}"
-                            )
-                    else:
-                        subqueries.append(
-                            f"{company_text} {metric_text}"
-                        )
-
-            return {
-                "subqueries": subqueries,
-                "statement_type": statement_type_filter,
-            }
-
-        if companies and is_comparison:
-            subqueries = []
-
+        elif companies and is_comparison:
             for company in companies:
                 company_text = company_retrieval_map.get(company, company)
                 metric_text = metric_retrieval_map["revenue"]
+                for time in time_suffixes:
+                    subqueries.append(f"{company_text} {metric_text} {time}".strip())
+            statement_type_filter = "consolidated"
 
-                if requested_years:
-                    for fiscal_year in requested_years:
-                        subqueries.append(
-                            f"{company_text} {metric_text} {fiscal_year}"
-                        )
-                else:
-                    subqueries.append(
-                        f"{company_text} {metric_text}"
-                    )
-
-            return {
-                "subqueries": subqueries,
-                "statement_type": "consolidated",
-            }
-
-        if len(companies) > 1 and is_description:
-            subqueries = []
-
+        elif len(companies) > 1 and is_description:
             for company in companies:
                 company_text = company_retrieval_map.get(company, company)
-                subqueries.append(
-                    f"{company_text} business overview services operations company profile"
-                )
+                subqueries.append(f"{company_text} business overview services operations company profile")
 
-            return {
-                "subqueries": subqueries,
-                "statement_type": None,
-            }
-
-        if len(companies) == 1 and metrics and requested_years:
+        # 2. Single Company Strategy Execution Block
+        elif len(companies) == 1:
             company = companies[0]
             company_text = company_retrieval_map.get(company, company)
 
-            subqueries = []
+            if metrics:
+                merged_metrics = list(metrics)
+                if "revenue" in merged_metrics and "growth" in merged_metrics:
+                    merged_metrics.remove("revenue")
 
-            for metric in metrics:
-                metric_text = metric_retrieval_map.get(metric, metric)
-
-                for fiscal_year in requested_years:
-                    subqueries.append(
-                        f"{company_text} {metric_text} {fiscal_year}"
-                    )
-
-            return {
-                "subqueries": subqueries,
-                "statement_type": statement_type_filter,
-            }
-
-        if len(companies) > 1 and metrics and requested_years:
-            subqueries = []
-
-            for company in companies:
-                company_text = company_retrieval_map.get(company, company)
-
-                for metric in metrics:
+                for metric in merged_metrics:
                     metric_text = metric_retrieval_map.get(metric, metric)
+                    for time in time_suffixes:
+                        subqueries.append(f"{company_text} {metric_text} {time}".strip())
 
-                    for fiscal_year in requested_years:
-                        subqueries.append(
-                            f"{company_text} {metric_text} {fiscal_year}"
-                        )
+            elif topics:
+                for topic in topics:
+                    topic_text = topic_retrieval_map.get(topic, topic)
+                    for time in time_suffixes:
+                        subqueries.append(f"{company_text} {topic_text} {time}".strip())
 
-            return {
-                "subqueries": subqueries,
-                "statement_type": statement_type_filter,
-            }
+            elif is_description:
+                subqueries.append(f"{company_text} business overview services operations company profile")
+            
+            else:
+                # Targeted qualitative fallback for structured metadata
+                fallback_intents = ["revenue", "guidance", "deal wins"]
+                for intent in fallback_intents:
+                    intent_text = metric_retrieval_map.get(intent) or topic_retrieval_map.get(intent, intent)
+                    for time in time_suffixes:
+                        subqueries.append(f"{company_text} {intent_text} {time}".strip())
 
-        if len(companies) == 1 and metrics:
-            company = companies[0]
-            company_text = company_retrieval_map.get(company, company)
-
-            subqueries = []
-
-            for metric in metrics:
-                metric_text = metric_retrieval_map.get(metric, metric)
-                subqueries.append(f"{company_text} {metric_text}")
-
-            return {
-                "subqueries": subqueries,
-                "statement_type": statement_type_filter,
-            }
-
-        if len(companies) == 1 and is_description:
-            company = companies[0]
-            company_text = company_retrieval_map.get(company, company)
-
-            return {
-                "subqueries": [
-                    f"{company_text} business overview services operations company profile"
-                ],
-                "statement_type": None,
-            }
+        # 3. Intent-Focused Structural Text Fallback
+        if not subqueries:
+            # Strip structural question/dialogue particles
+            cleaned_query = re.sub(
+                r"^(what|how|why|who|when|did|does|which|were|tell me|can you|please)\s+",
+                "",
+                query,
+                flags=re.IGNORECASE,
+            ).strip()
+            subqueries = [cleaned_query]
 
         return {
-            "subqueries": [query],
-            "statement_type": None,
+            "subqueries": subqueries,
+            "companies": companies,
+            "metrics": metrics,
+            "topics": topics,
+            "years": requested_years,
+            "quarters": requested_quarters,
+            "statement_type": statement_type_filter,
+            "is_comparison": is_comparison,
         }
+
+    def _find_companies(self, query_lower):
+        companies = []
+        for canonical_company, aliases in company_aliases.items():
+            for alias in aliases:
+                if re.search(rf"\b{re.escape(alias)}\b", query_lower):
+                    if canonical_company not in companies:
+                        companies.append(canonical_company)
+                    break
+        return companies
+
+    def _find_metrics(self, query_lower):
+        return [
+            metric
+            for metric in metric_keywords
+            if metric in query_lower
+        ]
+
+    def _find_topics(self, query_lower):
+        matched_topics = []
+        for topic, patterns in NARRATIVE_TOPICS.items():
+            if any(word in query_lower for word in patterns):
+                matched_topics.append(topic)
+        return matched_topics
+
+    def _extract_quarters(self, query_lower):
+        quarter_patterns = {
+            "Q1": [r"\bq1\b", r"\bq\s*1\b", r"\bquarter\s*1\b", r"\bfirst quarter\b"],
+            "Q2": [r"\bq2\b", r"\bq\s*2\b", r"\bquarter\s*2\b", r"\bsecond quarter\b"],
+            "Q3": [r"\bq3\b", r"\bq\s*3\b", r"\bquarter\s*3\b", r"\bthird quarter\b"],
+            "Q4": [r"\bq4\b", r"\bq\s*4\b", r"\bquarter\s*4\b", r"\bfourth quarter\b"],
+        }
+        found_quarters = []
+        for quarter, patterns in quarter_patterns.items():
+            if any(re.search(pattern, query_lower) for pattern in patterns):
+                found_quarters.append(quarter)
+        return found_quarters
 
     def _extract_explicit_fiscal_years(self, query_lower):
         years = []
-
         fy_matches = re.findall(r"\bfy[\s_-]?(\d{2,4})\b", query_lower)
         for year in fy_matches:
             if len(year) == 2:
@@ -260,13 +282,11 @@ class QueryDecomposer:
 
         seen = set()
         normalized = []
-
         for year in years:
             year = year.upper()
             if year not in seen:
                 seen.add(year)
                 normalized.append(year)
-
         return normalized
 
     def _get_requested_temporal_years(self, query_lower, explicit_years):
@@ -287,24 +307,3 @@ class QueryDecomposer:
             return available_fiscal_years
 
         return []
-
-    def _find_companies(self, query_lower):
-        companies = []
-
-        for canonical_company, aliases in company_aliases.items():
-            if canonical_company in companies:
-                continue
-
-            for alias in aliases:
-                if re.search(rf"\b{re.escape(alias)}\b", query_lower):
-                    companies.append(canonical_company)
-                    break
-
-        return companies
-
-    def _find_metrics(self, query_lower):
-        return set(
-            metric
-            for metric in metric_keywords
-            if metric in query_lower
-        )

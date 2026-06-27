@@ -33,11 +33,8 @@ class QAChain:
         self.description_words = [
             "what does",
             "business",
-            "company",
             "do",
             "overview",
-            "services",
-            "operations",
         ]
 
         self.temporal_words = [
@@ -138,10 +135,17 @@ class QAChain:
         companies = self.rag.decomposer._find_companies(query_lower)
         metrics = self.rag.decomposer._find_metrics(query_lower)
 
-        is_comparison = any(word in query_lower for word in self.comparison_words)
         explicit_year = self._extract_fiscal_year(query)
+        is_comparison = any(word in query_lower for word in self.comparison_words)
+        is_temporal = any(word in query_lower for word in self.temporal_words)
 
-        if is_comparison and len(companies) >= 2 and metrics and not explicit_year:
+        if explicit_year or is_temporal:
+            return False
+
+        if metrics and companies:
+            return True
+
+        if is_comparison and len(companies) >= 2 and metrics:
             return True
 
         return False
@@ -153,63 +157,139 @@ class QAChain:
 
     def _build_prompt(self, query, context):
         return f"""
-You are a financial analyst. Answer ONLY from the provided context.
+You are a financial analyst. Answer ONLY using the provided context.
 
 Rules:
+
 - Do not use outside knowledge.
-- Do not invent numbers, years, units, currencies, or reporting periods.
-- If a requested value is missing or not explicitly stated for the requested company/metric/year, write exactly:
+- Do not invent facts, numbers, years, currencies, units, or reporting periods.
+- If the requested information is not explicitly present in the retrieved context, write exactly:
   Not available in the retrieved context.
-- Do not calculate, derive, normalize, or convert values unless the user explicitly asks and the context provides the required basis.
-- For year-wise questions, include only years explicitly present in the context.
-- For comparison questions, compare or rank only if values are for the same metric, same fiscal year, and same unit/currency.
-- If units/currencies differ, write exactly:
+- Never guess or infer missing values.
+- Do not calculate, derive, normalize, or convert values unless the user explicitly requests it and the retrieved context provides all required information.
+- When both standalone and consolidated financial figures are present and the user does not specify which one they want, prefer consolidated figures.
+- Ignore note disclosures, subsidiary schedules, related-party disclosures, accounting policies, and appendices unless the user explicitly asks about them.
+- For change/delta questions (e.g. "how did revenue change from FY24 to FY26"), 
+  if both period values are present in the context, report both values and 
+  calculate the change. This is explicitly permitted.
+Context Usage:
+
+- Use all relevant retrieved chunks before answering.
+- Do not stop after finding the first matching value.
+- If the requested information appears across multiple retrieved chunks, combine the information into a single answer.
+- If duplicate information appears, use the clearest and most complete version.
+
+Single-company questions:
+
+- Extract the requested value directly from the most relevant context.
+- Prefer the chunk containing the requested company, fiscal year, and metric together.
+- Do not replace missing values using information from another fiscal year or company.
+
+Year-wise / Trend questions:
+
+- Search all retrieved chunks and extract every fiscal year or reporting period explicitly available. Do not stop after finding the first year.
+- Include only years that appear in the context.
+- Do not invent missing years.
+- After listing the values, briefly summarize the observed trend.
+
+Comparison questions:
+
+- Extract values for every requested company.
+- Compare only if:
+  - the metric is identical,
+  - the reporting period is identical,
+  - the units and currencies are identical.
+- If units or currencies differ, write exactly:
   Ranking not possible because the reported units/currencies differ across companies.
-- Keep the answer concise and factual.
-- When a question asks for revenue, profit, or other financial metrics 
-  without specifying standalone or consolidated, prefer consolidated 
-  figures if both are available in the context.
+- If one or more companies are missing values, report the available values and state which companies are missing.
+- Search all retrieved chunks before concluding that a company's value is unavailable.
+- If multiple chunks contain the requested metric, use the clearest and most complete value.
+- Do not stop after finding the first company's value.
 
+Business overview questions:
 
-Answer format:
+- Summarize only information explicitly stated in the retrieved context.
+- Do not add external company knowledge.
+
+Presentation and Earnings Call questions:
+
+- Prioritize management commentary, guidance, outlook, strategy, AI initiatives, deal wins, pipeline, bookings, hiring, macro commentary, client demand, pricing, and operational highlights when available in the retrieved context.
+
+Output Format
 
 1) Single-company KPI
+
 Company: <company>
+
 Metric: <metric>
-Value: <value>
+
+Value: <value or "Not available in the retrieved context">
+
 Reporting period: <period or "Not available in the retrieved context">
+
 Unit/Currency: <unit or "Not available in the retrieved context">
 
 Explanation:
-<1-2 sentence explanation>
+<1-2 concise sentences>
 
-2) Year-wise / trend question
+--------------------------------------------------
+
+2) Year-wise / Trend
+
 | Year / Period | Metric | Value | Unit/Currency |
 |---------------|--------|-------|---------------|
 
 Explanation:
 <brief trend summary>
 
-3) Comparison question
+--------------------------------------------------
+
+3) Comparison
+
 | Company | Metric | Value | Unit/Currency |
 |---------|--------|-------|---------------|
 
 Unit Validation:
-<whether units/currencies match>
+<same unit/currency or different>
 
 Ranking:
-<ranking if directly comparable, otherwise the exact sentence above>
+<ranking or the exact required sentence>
 
 Explanation:
-<brief explanation>
+<brief comparison summary>
 
-4) Business / company overview
+--------------------------------------------------
+
+4) Business Overview
+
 Company: <company>
 
 Business Overview:
-- <bullet 1>
-- <bullet 2>
-- <bullet 3>
+
+- <point 1>
+
+- <point 2>
+
+- <point 3>
+
+# After line 241 (the </brief trend summary> line), add:
+
+--------------------------------------------------
+
+5) Change / Delta question (e.g. "how did X change from FY24 to FY26")
+
+Metric: <metric>
+Company: <company>
+
+| Period     | Value          | Unit/Currency |
+|------------|----------------|---------------|
+| <earlier>  | <earlier value>| <unit>        |
+| <later>    | <later value>  | <unit>        |
+
+Change: <absolute change> (<percentage change if calculable from the two values above>)
+
+Explanation:
+<1-2 sentences on direction and magnitude of change>
 
 Context:
 {context}
@@ -233,7 +313,6 @@ Answer:
                 "Sorry, I couldn't reach the AI service right now "
                 f"({type(e).__name__}). Please try again in a moment."
             )
-        
 
     def _format_citations(self, sources, max_sources=15):
         if not sources:
@@ -287,7 +366,7 @@ Answer:
                 "ok": False,
                 "needs_clarification": True,
                 "clarification_type": "company",
-                "error": "Please choose a valid company: TCS, Infosys, or Wipro."
+                "error": "Please choose a valid company: TCS, Infosys, or Wipro.",
             }
 
         selected_company = companies[0]
@@ -311,7 +390,7 @@ Answer:
                 "ok": False,
                 "needs_clarification": True,
                 "clarification_type": "fiscal_year",
-                "error": f"Please choose a valid fiscal year: {valid_text}."
+                "error": f"Please choose a valid fiscal year: {valid_text}.",
             }
 
         if year not in pending["valid_years"]:
@@ -320,7 +399,7 @@ Answer:
                 "ok": False,
                 "needs_clarification": True,
                 "clarification_type": "fiscal_year",
-                "error": f"I currently have data for {valid_text}. Please choose one of those."
+                "error": f"I currently have data for {valid_text}. Please choose one of those.",
             }
 
         original_query = pending["original_query"]
@@ -334,10 +413,7 @@ Answer:
         query = query.strip()
 
         if not query:
-            return {
-                "ok": False,
-                "error": "Please enter a question."
-            }
+            return {"ok": False, "error": "Please enter a question."}
 
         pending_company_resolution = self._handle_pending_company_clarification(query)
         if pending_company_resolution:
@@ -354,18 +430,15 @@ Answer:
                 return pending_year_resolution
 
         if self._needs_company_clarification(query):
-            self.memory["pending_company_clarification"] = {
-                "original_query": query
-            }
+            self.memory["pending_company_clarification"] = {"original_query": query}
 
             return {
                 "ok": False,
                 "needs_clarification": True,
                 "clarification_type": "company",
                 "error": (
-                    "Which company do you want this for — "
-                    "TCS, Infosys, or Wipro?"
-                )
+                    "Which company do you want this for — TCS, Infosys, or Wipro?"
+                ),
             }
 
         if self._needs_year_clarification(query):
@@ -376,22 +449,19 @@ Answer:
             self.memory["pending_year_clarification"] = {
                 "original_query": query,
                 "companies": companies,
-                "valid_years": valid_years
+                "valid_years": valid_years,
             }
 
             return {
                 "ok": False,
                 "needs_clarification": True,
                 "clarification_type": "fiscal_year",
-                "error": f"Which fiscal year should I compare — {valid_text}?"
+                "error": f"Which fiscal year should I compare — {valid_text}?",
             }
 
         self._update_memory(query)
 
-        result = self.rag.get_context(
-            query,
-            memory_companies=self.memory["companies"]
-        )
+        result = self.rag.get_context(query, memory_companies=self.memory["companies"])
 
         context = result["context"]
         documents = result.get("documents", [])
@@ -402,10 +472,7 @@ Answer:
         answer, error = self._generate_answer(prompt)
 
         if error:
-            return {
-                "ok": False,
-                "error": error
-            }
+            return {"ok": False, "error": error}
 
         citations = self._format_citations(metadata)
 
@@ -418,7 +485,7 @@ Answer:
             "contexts": documents,
             "metadata": metadata,
             "subqueries": subqueries,
-            "memory_companies": list(self.memory["companies"])
+            "memory_companies": list(self.memory["companies"]),
         }
 
     def ask(self, query):
