@@ -1,14 +1,14 @@
 from src.agents.state import AgentState
-from src.features.rag import RAGPipeline
+from src.pipeline import get_pipeline
 from src.retrieval.query_decomposer import QueryDecomposer
 
-_rag = RAGPipeline()
 _decomposer = QueryDecomposer()
 
 
 def run_evidence_agent(state: AgentState) -> AgentState:
     query = state["query"]
     retry_count = state.get("retry_count", 0)
+    existing_evidence = state.get("evidence") or {}
 
     companies = state.get("companies") or []
     metrics = state.get("metrics") or []
@@ -26,15 +26,18 @@ def run_evidence_agent(state: AgentState) -> AgentState:
         quarters = decomposed.get("quarters", [])
         is_comparison = decomposed.get("is_comparison", False)
 
-    result = _rag.get_context(query, memory_companies=companies or None)
+    rag = get_pipeline()
+    result = rag.get_context(query, memory_companies=companies or None)
+
+    preserved_consistency = existing_evidence.get("consistency")
 
     evidence = {
-        "documents": result["documents"],
-        "metadata": result["metadata"],
+        "documents": result.get("documents", []),
+        "metadata": result.get("metadata", []),
         "citations": [],
-        "subqueries": result["subqueries"],
-        "context": result["context"],
-        "consistency": None,
+        "subqueries": result.get("subqueries", []),
+        "context": result.get("context", ""),
+        "consistency": preserved_consistency,
     }
 
     return {

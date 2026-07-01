@@ -1,16 +1,15 @@
 import json
 import re
+import time
 
 from dotenv import load_dotenv
 from groq import Groq, GroqError
 
 from src.agents.state import AgentState
-from src.features.rag import RAGPipeline
 
 load_dotenv()
 
 _client = Groq()
-_rag = RAGPipeline()
 
 DOC_TYPES = ["investor_presentation", "earnings_call", "annual_report"]
 
@@ -54,24 +53,37 @@ Annual Report:
 """
 
 
-def _retrieve_for_doc_type(company: str, metric: str, period: str, doc_type: str) -> str:
-    query = f"{company} {metric} {period} {doc_type}"
+def _retrieve_for_doc_type(
+    retriever,
+    reranker,
+    company: str,
+    metric: str,
+    period: str,
+    doc_type: str,
+) -> str:
+    query = f"{company} {metric} {period}"
 
-    result = _rag.get_context(
-        query,
-        memory_companies=[company],
-    )
+    filters = {
+        "companies": [company],
+        "doc_types": [doc_type],
+    }
 
-    docs = result.get("documents", [])
+    results = retriever.search(query=query, n_results=12, filters=filters)
+
+    docs = results.get("documents", [])
+    metadata = results.get("metadata", [])
+
     if not docs:
         return ""
 
-    filtered = []
-    for doc, meta in zip(docs, result.get("metadata", [])):
-        if str(meta.get("doc_type", "")).lower() == doc_type:
-            filtered.append(doc)
+    top_results = reranker.rerank(
+        query=query,
+        documents=docs,
+        metadata=metadata,
+        top_k=min(4, len(docs)),
+    )
 
-    return "\n\n".join(filtered[:4]) if filtered else "\n\n".join(docs[:3])
+    return "\n\n".join(doc for doc, _meta, _score in top_results)
 
 
 def _parse_diff_response(raw: str) -> dict:
@@ -90,7 +102,29 @@ def _parse_diff_response(raw: str) -> dict:
     }
 
 
+def _call_llm_with_retry(prompt: str, max_attempts: int = 3) -> dict:
+    for attempt in range(max_attempts):
+        try:
+            response = _client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0,
+            )
+            return _parse_diff_response(response.choices[0].message.content)
+        except GroqError as e:
+            if attempt < max_attempts - 1:
+                time.sleep(2 ** attempt)
+            else:
+                return {
+                    "verdict": "insufficient_data",
+                    "differences": [],
+                    "summary": f"Consistency check failed after {max_attempts} attempts ({type(e).__name__}).",
+                }
+
+
 def run_consistency_agent(state: AgentState) -> AgentState:
+    from src.pipeline import get_retriever, get_reranker
+
     companies = state.get("companies") or []
     metrics = state.get("metrics") or []
     years = state.get("years") or []
@@ -100,6 +134,9 @@ def run_consistency_agent(state: AgentState) -> AgentState:
     period_parts = years + quarters
     period = " ".join(period_parts) if period_parts else "latest"
 
+    retriever = get_retriever()
+    reranker = get_reranker()
+
     consistency_results = []
 
     for company in companies:
@@ -108,12 +145,30 @@ def run_consistency_agent(state: AgentState) -> AgentState:
 
             for doc_type in DOC_TYPES:
                 context = _retrieve_for_doc_type(
+                    retriever=retriever,
+                    reranker=reranker,
                     company=company,
                     metric=metric,
                     period=period,
                     doc_type=doc_type,
                 )
                 source_contexts[doc_type] = context if context else "No relevant content found."
+
+            has_content = any(
+                v != "No relevant content found."
+                for v in source_contexts.values()
+            )
+
+            if not has_content:
+                consistency_results.append({
+                    "verdict": "insufficient_data",
+                    "differences": [],
+                    "summary": "No content found across any source type for this metric and period.",
+                    "company": company,
+                    "metric": metric,
+                    "period": period,
+                })
+                continue
 
             prompt = DIFF_PROMPT.format(
                 company=company,
@@ -124,26 +179,16 @@ def run_consistency_agent(state: AgentState) -> AgentState:
                 annual_context=source_contexts["annual_report"],
             )
 
-            try:
-                response = _client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
-                    messages=[{"role": "user", "content": prompt}],
-                    temperature=0,
-                )
-                raw = response.choices[0].message.content
-                result = _parse_diff_response(raw)
+            result = _call_llm_with_retry(prompt)
 
-            except GroqError:
-                result = {
-                    "verdict": "insufficient_data",
-                    "differences": [],
-                    "summary": "Consistency check could not be completed — LLM call failed.",
-                }
+            consistency_results.append({
+                **result,
+                "company": company,
+                "metric": metric,
+                "period": period,
+            })
 
-            result["company"] = company
-            result["metric"] = metric
-            result["period"] = period
-            consistency_results.append(result)
+            time.sleep(1)
 
     updated_evidence = {
         **existing_evidence,

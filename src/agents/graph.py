@@ -1,4 +1,7 @@
+import time
+
 from dotenv import load_dotenv
+from groq import Groq, GroqError
 from langgraph.graph import StateGraph, END
 
 from src.agents.state import AgentState
@@ -9,7 +12,9 @@ from src.features.qa_chain import QAChain
 
 load_dotenv()
 
-_qa = QAChain()
+_client = Groq()
+_qa = QAChain.__new__(QAChain)
+_qa.client = _client
 
 
 def _route_after_evidence(state: AgentState) -> str:
@@ -34,10 +39,25 @@ def run_generate_answer(state: AgentState) -> AgentState:
         context = consistency_prefix + "\n\n---\n\n" + context
 
     prompt = _qa._build_prompt(query, context)
-    answer, error = _qa._generate_answer(prompt)
 
-    if error:
-        answer = error
+    answer = None
+    for attempt in range(3):
+        try:
+            response = _client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0,
+            )
+            answer = response.choices[0].message.content
+            break
+        except GroqError as e:
+            if attempt < 2:
+                time.sleep(2 ** attempt)
+            else:
+                answer = (
+                    f"Sorry, I couldn't reach the AI service right now "
+                    f"({type(e).__name__}). Please try again in a moment."
+                )
 
     return {
         **state,
@@ -63,9 +83,10 @@ def run_finalize(state: AgentState) -> AgentState:
             seen.add(key)
             citations.append(f"{source} (page {page})" if page else source)
 
-    citation_block = ""
-    if citations:
-        citation_block = "\n\nSources:\n" + "\n".join(f"- {c}" for c in citations)
+    citation_block = (
+        "\n\nSources:\n" + "\n".join(f"- {c}" for c in citations)
+        if citations else ""
+    )
 
     consistency_block = ""
     if consistency:
@@ -76,14 +97,15 @@ def run_finalize(state: AgentState) -> AgentState:
         consistency_block = "\n\nConsistency Check:\n" + "\n".join(verdicts)
 
     confidence = verification.get("confidence")
-    confidence_block = ""
-    if confidence is not None:
-        confidence_block = f"\n\n[Confidence: {round(confidence * 100)}%]"
+    confidence_block = (
+        f"\n\n[Confidence: {round(confidence * 100)}%]"
+        if confidence is not None else ""
+    )
 
     unverified = verification.get("unverified_claims", [])
     unverified_block = ""
     if unverified:
-        unverified_block = "\n\n[Unverified claims flagged by verifier:]\n" + "\n".join(
+        unverified_block = "\n\n[Unverified claims:]\n" + "\n".join(
             f"  - {c}" for c in unverified
         )
 
@@ -91,17 +113,15 @@ def run_finalize(state: AgentState) -> AgentState:
     if reason and not verification.get("grounded"):
         unverified_block += f"\n  Note: {reason}"
 
-    final_answer = (
-        draft_answer
-        + citation_block
-        + consistency_block
-        + confidence_block
-        + unverified_block
-    )
-
     return {
         **state,
-        "final_answer": final_answer,
+        "final_answer": (
+            draft_answer
+            + citation_block
+            + consistency_block
+            + confidence_block
+            + unverified_block
+        ),
     }
 
 

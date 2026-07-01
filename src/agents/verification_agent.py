@@ -1,5 +1,6 @@
 import json
 import re
+import time
 
 from dotenv import load_dotenv
 from groq import Groq, GroqError
@@ -82,7 +83,7 @@ def run_verification_agent(state: AgentState) -> AgentState:
             },
         }
 
-    if retry_count > MAX_RETRIES:
+    if retry_count >= MAX_RETRIES:
         return {
             **state,
             "verification": {
@@ -98,22 +99,27 @@ def run_verification_agent(state: AgentState) -> AgentState:
         context=context,
     )
 
-    try:
-        response = _client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0,
-        )
-        raw = response.choices[0].message.content
-        verification = _parse_verification_response(raw)
-
-    except GroqError as e:
-        verification = {
-            "grounded": False,
-            "confidence": 0.0,
-            "unverified_claims": [],
-            "reason": f"Verification unavailable — LLM call failed ({type(e).__name__}).",
-        }
+    for attempt in range(3):
+        try:
+            response = _client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0,
+            )
+            verification = _parse_verification_response(
+                response.choices[0].message.content
+            )
+            break
+        except GroqError as e:
+            if attempt < 2:
+                time.sleep(2 ** attempt)
+            else:
+                verification = {
+                    "grounded": False,
+                    "confidence": 0.0,
+                    "unverified_claims": [],
+                    "reason": f"Verification unavailable — LLM call failed ({type(e).__name__}).",
+                }
 
     return {
         **state,
@@ -128,7 +134,7 @@ def check_grounding(state: AgentState) -> str:
     if verification.get("grounded"):
         return "grounded"
 
-    if retry_count > MAX_RETRIES:
+    if retry_count >= MAX_RETRIES:
         return "grounded"
 
     return "retry"
