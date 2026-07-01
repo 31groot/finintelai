@@ -1,9 +1,9 @@
-from src.features.qa_chain import QAChain
-
-qa_chain = QAChain()
+from src.agents.graph import run
 
 print("Financial RAG Chatbot Ready")
 print("Type 'exit' to quit.\n")
+
+memory_companies = []
 
 while True:
     question = input("Ask: ").strip()
@@ -16,11 +16,14 @@ while True:
         continue
 
     try:
-        answer = qa_chain.ask(question)
+        result = run(question, companies=memory_companies)
 
-        print("\nANSWER:")
-        print(answer)
-        print()
+        print("\n" + "=" * 60)
+        print(result["answer"])
+        print("=" * 60 + "\n")
+
+        companies = result.get("verification", {})
+        detected = result.get("consistency")
 
     except Exception as e:
         print("\nERROR:")
