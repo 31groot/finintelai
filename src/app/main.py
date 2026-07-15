@@ -2,7 +2,7 @@ from pathlib import Path
 import re
 
 from src.ingestion.pdf_loader import load_pdf_pages
-from src.ingestion.chunker import chunk_page
+from src.ingestion.chunker import chunk_text
 from src.ingestion.table_parser import extract_tables
 from src.ingestion.table_chunker import chunk_tables
 from src.retrieval.embeddings import EmbeddingModel
@@ -231,7 +231,7 @@ def main():
             page_num = page_data["page"]
             page_text = page_data["text"]
 
-            chunks = chunk_page(page_text, doc_type=source_meta["doc_type"])
+            chunks = chunk_text(page_text, doc_type=source_meta["doc_type"])
 
             for chunk in chunks:
                 text_chunks.append(chunk)

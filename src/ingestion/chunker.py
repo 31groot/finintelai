@@ -38,20 +38,3 @@ def chunk_text(text: str, doc_type: str = "general"):
 
     splitter = get_splitter(doc_type)
     return splitter.split_text(text.strip())
-
-
-def chunk_page(text: str, doc_type: str = "general"):
-    return chunk_text(text, doc_type=doc_type)
-
-
-def chunk_page_with_metadata(text: str, metadata: dict, doc_type: str = "general"):
-    chunks = chunk_text(text, doc_type=doc_type)
-
-    chunked_items = []
-    for chunk in chunks:
-        chunked_items.append({
-            "text": chunk,
-            "metadata": dict(metadata)
-        })
-
-    return chunked_items
