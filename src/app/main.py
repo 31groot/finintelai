@@ -55,7 +55,6 @@ STANDALONE_MARKERS = [
     "standalone statement of changes",
 ]
 
-
 def infer_company_from_source(source_name: str):
     source_lower = source_name.lower()
 
@@ -127,7 +126,6 @@ def infer_source_kind(doc_type: str):
         return "management_commentary"
     return "general"
 
-
 def parse_source_metadata(source_name: str):
     doc_type = infer_doc_type_from_source(source_name)
 
@@ -138,7 +136,6 @@ def parse_source_metadata(source_name: str):
         "source_kind": infer_source_kind(doc_type),
         "fiscal_year": infer_fiscal_year_from_source(source_name),
         "quarter": infer_quarter_from_source(source_name),
-        "report_date": None,
     }
 
 
@@ -148,19 +145,12 @@ def build_source_id(source_meta):
     quarter = (source_meta.get("quarter") or "").lower()
     doc_type = source_meta.get("doc_type") or ""
 
-    suffix_map = {
-        "annual_report": "annual",
-        "investor_presentation": "presentation",
-        "earnings_call": "transcript",
-    }
-
-    suffix = suffix_map.get(doc_type, doc_type)
 
     parts = [company, fiscal_year]
     if quarter:
         parts.append(quarter)
-    if suffix:
-        parts.append(suffix)
+    if doc_type:
+        parts.append(doc_type)
 
     return "_".join([p for p in parts if p])
 
@@ -169,7 +159,6 @@ def build_chunk_metadata(
     source_meta,
     page=None,
     chunk_type="text",
-    extra=None,
     page_text=""
 ):
     metadata = {
@@ -179,7 +168,6 @@ def build_chunk_metadata(
         "source_kind": source_meta.get("source_kind") or "",
         "fiscal_year": source_meta.get("fiscal_year") or "",
         "quarter": source_meta.get("quarter") or "",
-        "report_date": source_meta.get("report_date") or "",
         "page": page if page is not None else -1,
         "chunk_type": chunk_type or "",
         "statement_type": infer_statement_type(page_text) if page_text else "general",
@@ -196,12 +184,11 @@ def normalize_table_metadata(table_metadata_list, source_meta):
     normalized = []
 
     for meta in table_metadata_list:
-        page = meta.get("page")
-        extra = {
-            k: v
-            for k, v in meta.items()
-            if k not in {"source", "page", "chunk_type"}
-        }
+        extra = meta.copy()
+
+        page = extra.pop("page", None)
+        extra.pop("source", None)
+        extra.pop("chunk_type", None)
 
         normalized.append(
             build_chunk_metadata(
