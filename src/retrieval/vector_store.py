@@ -1,7 +1,5 @@
 import uuid
 import chromadb
-
-
 class VectorStore:
     def __init__(self):
         self.client = chromadb.PersistentClient(path="data/chromadb")
