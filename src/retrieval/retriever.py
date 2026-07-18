@@ -3,7 +3,7 @@ from src.retrieval.vector_store import VectorStore
 from src.retrieval.bm25 import BM25Retriever
 
 RRF_K = 60
-
+RRF_CANDIDATES = 50
 
 class Retriever:
     def __init__(self):
@@ -180,12 +180,12 @@ class Retriever:
             filters,
         )
 
-        vector_docs = vector_docs[:n_results]
-        vector_metadata = vector_metadata[:n_results]
+        vector_docs = vector_docs[:RRF_CANDIDATES]
+        vector_metadata = vector_metadata[:RRF_CANDIDATES]
 
         bm25_docs, bm25_metadata = self._get_filtered_bm25_docs(
             query=query,
-            top_k=n_results,
+            top_k=RRF_CANDIDATES,
             filters=filters,
         )
 
