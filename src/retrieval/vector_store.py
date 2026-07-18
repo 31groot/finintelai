@@ -1,27 +1,29 @@
 import uuid
 import chromadb
+
+BATCH_SIZE = 5000
+
+
 class VectorStore:
     def __init__(self):
         self.client = chromadb.PersistentClient(path="data/chromadb")
-        self.collection = self.client.get_or_create_collection(name="finintelai")
+        self.collection = self.client.get_or_create_collection(
+            name="finintelai"
+        )
 
-    def reset(self):
-        try:
-            self.client.delete_collection(name="finintelai")
-        except ValueError:
-            pass
-
-        self.collection = self.client.get_or_create_collection(name="finintelai")
-        print("Collection reset.")
+    def source_exists(self, source_id: str) :
+        result = self.collection.get(
+            where={"source": source_id},
+            limit=1,
+        )
+        return len(result["ids"]) > 0
 
     def add_documents(self, chunks, embeddings, metadata=None):
         if metadata is None:
             metadata = [{} for _ in chunks]
 
-        batch_size = 5000
-
-        for start in range(0, len(chunks), batch_size):
-            end = start + batch_size
+        for start in range(0, len(chunks), BATCH_SIZE):
+            end = start + BATCH_SIZE
 
             batch_chunks = chunks[start:end]
             batch_embeddings = embeddings[start:end]
@@ -33,7 +35,7 @@ class VectorStore:
                 ids=ids,
                 documents=batch_chunks,
                 embeddings=batch_embeddings.tolist(),
-                metadatas=batch_metadata
+                metadatas=batch_metadata,
             )
 
             print(f"Stored batch: {start} -> {min(end, len(chunks))}")
@@ -43,7 +45,7 @@ class VectorStore:
     def count(self):
         return self.collection.count()
 
-    def get_all_documents(self, batch_size=5000):
+    def get_all_documents(self, batch_size=BATCH_SIZE):
         total = self.collection.count()
 
         all_ids = []
@@ -54,7 +56,7 @@ class VectorStore:
             batch = self.collection.get(
                 include=["documents", "metadatas"],
                 limit=batch_size,
-                offset=offset
+                offset=offset,
             )
 
             all_ids.extend(batch.get("ids", []))
@@ -64,5 +66,5 @@ class VectorStore:
         return {
             "ids": all_ids,
             "documents": all_documents,
-            "metadatas": all_metadatas
+            "metadatas": all_metadatas,
         }

@@ -159,7 +159,8 @@ def build_chunk_metadata(
     source_meta,
     page=None,
     chunk_type="text",
-    page_text=""
+    page_text="",
+    extra=None
 ):
     metadata = {
         "source": source_meta.get("source") or "",
@@ -172,11 +173,11 @@ def build_chunk_metadata(
         "chunk_type": chunk_type or "",
         "statement_type": infer_statement_type(page_text) if page_text else "general",
     }
-
-    if extra:
-        for key, value in extra.items():
-            metadata[key] = "" if value is None else value
-
+    
+    # If there are additional parser-specific metadata fields, merge them in
+    if extra and isinstance(extra, dict):
+        metadata.update(extra)
+        
     return metadata
 
 
@@ -211,11 +212,19 @@ def main():
 
     all_chunks = []
     all_metadata = []
+    
+    # Change 1: Create the VectorStore once at initialization
+    store = VectorStore()
 
     for pdf_path in pdf_files:
         source_name = str(pdf_path).replace("\\", "/")
         source_meta = parse_source_metadata(source_name)
         source_meta["source"] = build_source_id(source_meta)
+
+        # Change 2: Check if this source ID is already indexed, skip if True
+        if store.source_exists(source_meta["source"]):
+            print(f"\nSkipping {source_meta['source']} (already indexed)")
+            continue
 
         print("\n" + "=" * 60)
         print(f"Processing: {pdf_path.stem}")
@@ -262,17 +271,23 @@ def main():
 
         print(f"Running total chunks: {len(all_chunks)}")
 
+    # Check if we actually found any new documents to index before generating embeddings
+    if not all_chunks:
+        print("\n" + "=" * 60)
+        print("No new documents to index. Vector store is up to date!")
+        print(f"Total documents in DB: {store.count()}")
+        return
+
     print("\n" + "=" * 60)
-    print("Embedding all chunks...")
+    print("Embedding all new chunks...")
     print("=" * 60)
 
     embedder = EmbeddingModel()
     embeddings = embedder.embed(all_chunks)
     print(f"Embeddings shape: {embeddings.shape}")
 
+    # Change 3: Directly add the new items into the existing store (No reset, no re-initialization)
     print("\nSaving to ChromaDB...")
-    store = VectorStore()
-    store.reset()
     store.add_documents(all_chunks, embeddings, all_metadata)
     print(f"Total documents in DB: {store.count()}")
 
