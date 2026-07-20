@@ -70,15 +70,45 @@ metric_retrieval_map = {
 }
 
 NARRATIVE_TOPICS = {
-    "guidance": ["guidance", "provide", "forecast", "outlook", "projections", "expected growth"],
-    "outlook": ["outlook", "future outlook", "growth trajectory", "demand environment", "macro environment"],
-    "deal wins": ["deal wins", "deals", "tcv", "large deals", "contract", "contracts", "order book", "wins"],
+    "guidance": [
+        "guidance",
+        "provide",
+        "forecast",
+        "outlook",
+        "projections",
+        "expected growth",
+    ],
+    "outlook": [
+        "outlook",
+        "future outlook",
+        "growth trajectory",
+        "demand environment",
+        "macro environment",
+    ],
+    "deal wins": [
+        "deal wins",
+        "deals",
+        "tcv",
+        "large deals",
+        "contract",
+        "contracts",
+        "order book",
+        "wins",
+    ],
 }
 
 topic_retrieval_map = {
     "guidance": "management guidance growth forecast outlook business projections management commentary forward looking expectations",
     "outlook": "business outlook demand environment growth trajectory macroeconomic commentary executive outlook",
     "deal wins": "deal wins total contract value TCV large deals mega deals order bookings new contracts won",
+}
+
+
+quarter_patterns = {
+    "Q1": [r"\bq1\b", r"\bq\s*1\b", r"\bquarter\s*1\b", r"\bfirst quarter\b"],
+    "Q2": [r"\bq2\b", r"\bq\s*2\b", r"\bquarter\s*2\b", r"\bsecond quarter\b"],
+    "Q3": [r"\bq3\b", r"\bq\s*3\b", r"\bquarter\s*3\b", r"\bthird quarter\b"],
+    "Q4": [r"\bq4\b", r"\bq\s*4\b", r"\bquarter\s*4\b", r"\bfourth quarter\b"],
 }
 
 temporal_words = [
@@ -89,10 +119,8 @@ temporal_words = [
     "across years",
     "last 2 years",
     "last 3 years",
-    "last 5 years",
     "past 2 years",
     "past 3 years",
-    "past 5 years",
     "trend",
     "historical",
     "history",
@@ -101,20 +129,21 @@ temporal_words = [
     "fy26",
     "fy25",
     "fy24",
-    "fy23",
     "fiscal 2026",
     "fiscal 2025",
     "fiscal 2024",
-    "fiscal 2023",
 ]
 
-available_fiscal_years = ["FY26", "FY25", "FY24", "FY23"]
+available_fiscal_years = [
+    "FY26",
+    "FY25",
+    "FY24",
+]
 
 FINANCIAL_METRICS = {"revenue", "profit", "ebitda", "margin", "growth"}
 
 
 class QueryDecomposer:
-
     def decompose(self, query, memory_companies=None):
         query_lower = query.lower()
 
@@ -125,17 +154,20 @@ class QueryDecomposer:
         metrics = self._find_metrics(query_lower)
         topics = self._find_topics(query_lower)
 
-        is_comparison = any(word in query_lower for word in comparison_words) or len(companies) > 1
+        is_comparison = (
+            any(word in query_lower for word in comparison_words) or len(companies) > 1
+        )
         is_description = any(word in query_lower for word in description_words)
 
         explicit_years = self._extract_explicit_fiscal_years(query_lower)
-        requested_years = self._get_requested_temporal_years(query_lower, explicit_years)
+        requested_years = self._get_requested_temporal_years(
+            query_lower, explicit_years
+        )
         requested_quarters = self._extract_quarters(query_lower)
 
         needs_consolidated = bool(set(metrics) & FINANCIAL_METRICS)
         statement_type_filter = "consolidated" if needs_consolidated else None
 
-        # Build clean chronological/temporal strings
         time_suffixes = []
         if requested_years and requested_quarters:
             for y in requested_years:
@@ -150,7 +182,6 @@ class QueryDecomposer:
 
         subqueries = []
 
-        # 1. Comparison & Structural Strategy Execution Block
         if companies and is_comparison and metrics:
             merged_metrics = list(metrics)
             if "revenue" in merged_metrics and "growth" in merged_metrics:
@@ -161,7 +192,9 @@ class QueryDecomposer:
                 for metric in merged_metrics:
                     metric_text = metric_retrieval_map.get(metric, metric)
                     for time in time_suffixes:
-                        subqueries.append(f"{company_text} {metric_text} {time}".strip())
+                        subqueries.append(
+                            f"{company_text} {metric_text} {time}".strip()
+                        )
 
         elif companies and is_comparison:
             for company in companies:
@@ -174,9 +207,10 @@ class QueryDecomposer:
         elif len(companies) > 1 and is_description:
             for company in companies:
                 company_text = company_retrieval_map.get(company, company)
-                subqueries.append(f"{company_text} business overview services operations company profile")
+                subqueries.append(
+                    f"{company_text} business overview services operations company profile"
+                )
 
-        # 2. Single Company Strategy Execution Block
         elif len(companies) == 1:
             company = companies[0]
             company_text = company_retrieval_map.get(company, company)
@@ -189,7 +223,9 @@ class QueryDecomposer:
                 for metric in merged_metrics:
                     metric_text = metric_retrieval_map.get(metric, metric)
                     for time in time_suffixes:
-                        subqueries.append(f"{company_text} {metric_text} {time}".strip())
+                        subqueries.append(
+                            f"{company_text} {metric_text} {time}".strip()
+                        )
 
             elif topics:
                 for topic in topics:
@@ -198,26 +234,23 @@ class QueryDecomposer:
                         subqueries.append(f"{company_text} {topic_text} {time}".strip())
 
             elif is_description:
-                subqueries.append(f"{company_text} business overview services operations company profile")
-            
+                subqueries.append(
+                    f"{company_text} business overview services operations company profile"
+                )
+
             else:
-                # Targeted qualitative fallback for structured metadata
                 fallback_intents = ["revenue", "guidance", "deal wins"]
                 for intent in fallback_intents:
-                    intent_text = metric_retrieval_map.get(intent) or topic_retrieval_map.get(intent, intent)
+                    intent_text = metric_retrieval_map.get(
+                        intent
+                    ) or topic_retrieval_map.get(intent, intent)
                     for time in time_suffixes:
-                        subqueries.append(f"{company_text} {intent_text} {time}".strip())
+                        subqueries.append(
+                            f"{company_text} {intent_text} {time}".strip()
+                        )
 
-        # 3. Intent-Focused Structural Text Fallback
         if not subqueries:
-            # Strip structural question/dialogue particles
-            cleaned_query = re.sub(
-                r"^(what|how|why|who|when|did|does|which|were|tell me|can you|please)\s+",
-                "",
-                query,
-                flags=re.IGNORECASE,
-            ).strip()
-            subqueries = [cleaned_query]
+            subqueries = [query.strip()]
 
         return {
             "subqueries": subqueries,
@@ -241,11 +274,7 @@ class QueryDecomposer:
         return companies
 
     def _find_metrics(self, query_lower):
-        return [
-            metric
-            for metric in metric_keywords
-            if metric in query_lower
-        ]
+        return [metric for metric in metric_keywords if metric in query_lower]
 
     def _find_topics(self, query_lower):
         matched_topics = []
@@ -255,12 +284,6 @@ class QueryDecomposer:
         return matched_topics
 
     def _extract_quarters(self, query_lower):
-        quarter_patterns = {
-            "Q1": [r"\bq1\b", r"\bq\s*1\b", r"\bquarter\s*1\b", r"\bfirst quarter\b"],
-            "Q2": [r"\bq2\b", r"\bq\s*2\b", r"\bquarter\s*2\b", r"\bsecond quarter\b"],
-            "Q3": [r"\bq3\b", r"\bq\s*3\b", r"\bquarter\s*3\b", r"\bthird quarter\b"],
-            "Q4": [r"\bq4\b", r"\bq\s*4\b", r"\bquarter\s*4\b", r"\bfourth quarter\b"],
-        }
         found_quarters = []
         for quarter, patterns in quarter_patterns.items():
             if any(re.search(pattern, query_lower) for pattern in patterns):
@@ -280,12 +303,11 @@ class QueryDecomposer:
         for year in fiscal_matches:
             years.append(f"FY{year[-2:]}")
 
-        seen = set()
+
         normalized = []
         for year in years:
             year = year.upper()
-            if year not in seen:
-                seen.add(year)
+            if year not in normalized:
                 normalized.append(year)
         return normalized
 
@@ -298,9 +320,7 @@ class QueryDecomposer:
 
         if "last 3 years" in query_lower or "past 3 years" in query_lower:
             return available_fiscal_years[:3]
-
-        if "last 5 years" in query_lower or "past 5 years" in query_lower:
-            return available_fiscal_years[:5]
+        
 
         is_temporal = any(word in query_lower for word in temporal_words)
         if is_temporal:

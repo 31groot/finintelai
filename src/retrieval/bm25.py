@@ -1,7 +1,5 @@
 import re
 from rank_bm25 import BM25Okapi
-
-
 class BM25Retriever:
     def __init__(self, documents):
         self.documents = documents
