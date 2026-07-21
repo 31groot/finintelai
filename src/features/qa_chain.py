@@ -2,21 +2,13 @@ import re
 from dotenv import load_dotenv
 from groq import Groq, GroqError
 from src.features.rag import RAGPipeline
+from src.retrieval.query_decomposer import company_aliases
 
 load_dotenv()
 
-
 class QAChain:
-    def __init__(self):
-        self.rag = RAGPipeline()
-        self.client = Groq()
-        self.memory = {
-            "companies": [],
-            "pending_year_clarification": None,
-            "pending_company_clarification": None,
-        }
 
-        self.comparison_words = [
+        comparison_words = [
             "compare",
             "comparison",
             "rank",
@@ -30,14 +22,15 @@ class QAChain:
             "vs",
         ]
 
-        self.description_words = [
+        description_words = [
             "what does",
+            "what does company do",
             "business",
-            "do",
             "overview",
         ]
 
-        self.temporal_words = [
+        temporal_words = [
+            "growth"
             "by year",
             "year wise",
             "year-wise",
@@ -48,7 +41,6 @@ class QAChain:
             "last 5 years",
             "past 2 years",
             "past 3 years",
-            "past 5 years",
             "trend",
             "historical",
             "history",
@@ -57,13 +49,19 @@ class QAChain:
             "fy26",
             "fy25",
             "fy24",
-            "fy23",
             "fiscal 2026",
             "fiscal 2025",
             "fiscal 2024",
-            "fiscal 2023",
         ]
 
+    def __init__(self):
+        self.rag = RAGPipeline()
+        self.client = Groq()
+        self.memory = {
+            "companies": [],
+            "pending_year_clarification": None,
+            "pending_company_clarification": None,
+        }
         self.valid_years = self._load_available_fiscal_years()
 
     def _load_available_fiscal_years(self):
@@ -114,9 +112,9 @@ class QAChain:
 
         has_memory = bool(self.memory["companies"])
 
-        is_description = any(word in query_lower for word in self.description_words)
-        is_comparison = any(word in query_lower for word in self.comparison_words)
-        is_temporal = any(word in query_lower for word in self.temporal_words)
+        is_description = any(word in query_lower for word in description_words)
+        is_comparison = any(word in query_lower for word in comparison_words)
+        is_temporal = any(word in query_lower for word in temporal_words)
 
         if companies:
             return False
@@ -136,8 +134,8 @@ class QAChain:
         metrics = self.rag.decomposer._find_metrics(query_lower)
 
         explicit_year = self._extract_fiscal_year(query)
-        is_comparison = any(word in query_lower for word in self.comparison_words)
-        is_temporal = any(word in query_lower for word in self.temporal_words)
+        is_comparison = any(word in query_lower for word in comparison_words)
+        is_temporal = any(word in query_lower for word in temporal_words)
 
         if explicit_year or is_temporal:
             return False
@@ -343,14 +341,12 @@ Answer:
             return None
 
         query_clean = query.strip().lower()
-
-        clarification_patterns = [
-            r"^(for\s+)?tcs$",
-            r"^(for\s+)?infosys$",
-            r"^(for\s+)?wipro$",
-            r"^(for\s+)?tata consultancy services$",
-            r"^(for\s+)?tata consultancy$",
-        ]
+        clarification_patterns = []
+        for aliases in company_aliases.values():
+            for alias in aliases:
+                clarification_patterns.append(
+                    rf"^(for\s+)?{re.escape(alias)}$"
+                )
 
         is_company_only_reply = any(
             re.fullmatch(pattern, query_clean) for pattern in clarification_patterns
@@ -363,9 +359,6 @@ Answer:
 
         if not companies:
             return {
-                "ok": False,
-                "needs_clarification": True,
-                "clarification_type": "company",
                 "error": "Please choose a valid company: TCS, Infosys, or Wipro.",
             }
 
@@ -387,18 +380,12 @@ Answer:
         if not year:
             valid_text = ", ".join(self._sort_fiscal_years_desc(pending["valid_years"]))
             return {
-                "ok": False,
-                "needs_clarification": True,
-                "clarification_type": "fiscal_year",
                 "error": f"Please choose a valid fiscal year: {valid_text}.",
             }
 
         if year not in pending["valid_years"]:
             valid_text = ", ".join(self._sort_fiscal_years_desc(pending["valid_years"]))
             return {
-                "ok": False,
-                "needs_clarification": True,
-                "clarification_type": "fiscal_year",
                 "error": f"I currently have data for {valid_text}. Please choose one of those.",
             }
 
@@ -413,7 +400,7 @@ Answer:
         query = query.strip()
 
         if not query:
-            return {"ok": False, "error": "Please enter a question."}
+            return { "error": "Please enter a question."}
 
         pending_company_resolution = self._handle_pending_company_clarification(query)
         if pending_company_resolution:
@@ -433,17 +420,14 @@ Answer:
             self.memory["pending_company_clarification"] = {"original_query": query}
 
             return {
-                "ok": False,
-                "needs_clarification": True,
-                "clarification_type": "company",
                 "error": (
-                    "Which company do you want this for — TCS, Infosys, or Wipro?"
+                    "Which company do you want this for - TCS, Infosys, or Wipro?"
                 ),
             }
 
         if self._needs_year_clarification(query):
             companies = self.rag.decomposer._find_companies(query.lower())
-            valid_years = self.valid_years or {"FY23", "FY24", "FY25", "FY26"}
+            valid_years = self.valid_years or {"FY24", "FY25", "FY26"}
             valid_text = ", ".join(self._sort_fiscal_years_desc(valid_years))
 
             self.memory["pending_year_clarification"] = {
@@ -453,9 +437,6 @@ Answer:
             }
 
             return {
-                "ok": False,
-                "needs_clarification": True,
-                "clarification_type": "fiscal_year",
                 "error": f"Which fiscal year should I compare — {valid_text}?",
             }
 
@@ -472,12 +453,11 @@ Answer:
         answer, error = self._generate_answer(prompt)
 
         if error:
-            return {"ok": False, "error": error}
+            return {"error": error}
 
         citations = self._format_citations(metadata)
 
         return {
-            "ok": True,
             "query": query,
             "answer": answer,
             "citations": citations,
@@ -491,7 +471,7 @@ Answer:
     def ask(self, query):
         trace = self.ask_with_trace(query)
 
-        if not trace["ok"]:
+        if "error" in trace:
             return trace["error"]
 
         return trace["answer"] + trace["citations"]

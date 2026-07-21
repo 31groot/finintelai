@@ -1,6 +1,5 @@
 from sentence_transformers import CrossEncoder
 class Reranker:
-
     def __init__(self):
         self.model = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
     def rerank(
