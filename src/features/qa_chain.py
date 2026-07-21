@@ -362,11 +362,11 @@ Answer:
                 "error": "Please choose a valid company: TCS, Infosys, or Wipro.",
             }
 
-        selected_company = companies[0]
+        company_text = " and ".join(companies)
         original_query = pending["original_query"]
-        resolved_query = f"{original_query} for {selected_company}"
+        resolved_query = f"{original_query} for {company_text}"
 
-        self.memory["companies"] = [selected_company]
+        self.memory["companies"] = companies
         self.memory["pending_company_clarification"] = None
         return {"resolved_query": resolved_query}
 
