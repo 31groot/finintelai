@@ -6,53 +6,54 @@ from src.retrieval.query_decomposer import company_aliases
 
 load_dotenv()
 
+
 class QAChain:
 
-        comparison_words = [
-            "compare",
-            "comparison",
-            "rank",
-            "ranking",
-            "highest",
-            "lowest",
-            "best",
-            "worst",
-            "better",
-            "versus",
-            "vs",
-        ]
+    comparison_words = [
+        "compare",
+        "comparison",
+        "rank",
+        "ranking",
+        "highest",
+        "lowest",
+        "best",
+        "worst",
+        "better",
+        "versus",
+        "vs",
+    ]
 
-        description_words = [
-            "what does",
-            "what does company do",
-            "business",
-            "overview",
-        ]
+    description_words = [
+        "what does",
+        "what does company do",
+        "business",
+        "overview",
+    ]
 
-        temporal_words = [
-            "growth"
-            "by year",
-            "year wise",
-            "year-wise",
-            "over the years",
-            "across years",
-            "last 2 years",
-            "last 3 years",
-            "last 5 years",
-            "past 2 years",
-            "past 3 years",
-            "trend",
-            "historical",
-            "history",
-            "over time",
-            "yearly",
-            "fy26",
-            "fy25",
-            "fy24",
-            "fiscal 2026",
-            "fiscal 2025",
-            "fiscal 2024",
-        ]
+    temporal_words = [
+        "growth",
+        "by year",
+        "year wise",
+        "year-wise",
+        "over the years",
+        "across years",
+        "last 2 years",
+        "last 3 years",
+        "last 5 years",
+        "past 2 years",
+        "past 3 years",
+        "trend",
+        "historical",
+        "history",
+        "over time",
+        "yearly",
+        "fy26",
+        "fy25",
+        "fy24",
+        "fiscal 2026",
+        "fiscal 2025",
+        "fiscal 2024",
+    ]
 
     def __init__(self):
         self.rag = RAGPipeline()
@@ -112,9 +113,9 @@ class QAChain:
 
         has_memory = bool(self.memory["companies"])
 
-        is_description = any(word in query_lower for word in description_words)
-        is_comparison = any(word in query_lower for word in comparison_words)
-        is_temporal = any(word in query_lower for word in temporal_words)
+        is_description = any(word in query_lower for word in self.description_words)
+        is_comparison = any(word in query_lower for word in self.comparison_words)
+        is_temporal = any(word in query_lower for word in self.temporal_words)
 
         if companies:
             return False
@@ -134,8 +135,8 @@ class QAChain:
         metrics = self.rag.decomposer._find_metrics(query_lower)
 
         explicit_year = self._extract_fiscal_year(query)
-        is_comparison = any(word in query_lower for word in comparison_words)
-        is_temporal = any(word in query_lower for word in temporal_words)
+        is_comparison = any(word in query_lower for word in self.comparison_words)
+        is_temporal = any(word in query_lower for word in self.temporal_words)
 
         if explicit_year or is_temporal:
             return False
@@ -170,6 +171,10 @@ Rules:
 - For change/delta questions (e.g. "how did revenue change from FY24 to FY26"), 
   if both period values are present in the context, report both values and 
   calculate the change. This is explicitly permitted.
+- If a value is stated on a constant-currency basis, label it as such;
+  do not present constant-currency and reported growth as the same figure.
+- Do not answer a question about actual results using a guidance or
+  outlook figure. If only guidance is available, say so explicitly.
 Context Usage:
 
 - Use all relevant retrieved chunks before answering.
@@ -270,8 +275,6 @@ Business Overview:
 
 - <point 3>
 
-# After line 241 (the </brief trend summary> line), add:
-
 --------------------------------------------------
 
 5) Change / Delta question (e.g. "how did X change from FY24 to FY26")
@@ -344,9 +347,7 @@ Answer:
         clarification_patterns = []
         for aliases in company_aliases.values():
             for alias in aliases:
-                clarification_patterns.append(
-                    rf"^(for\s+)?{re.escape(alias)}$"
-                )
+                clarification_patterns.append(rf"^(for\s+)?{re.escape(alias)}$")
 
         is_company_only_reply = any(
             re.fullmatch(pattern, query_clean) for pattern in clarification_patterns
@@ -378,13 +379,17 @@ Answer:
         year = self._extract_fiscal_year(query)
 
         if not year:
-            valid_text = ", ".join(self._sort_fiscal_years_desc(pending["valid_years"]))
+            valid_text = ", ".join(
+                self._sort_fiscal_years_desc(pending["valid_years"])
+            )
             return {
                 "error": f"Please choose a valid fiscal year: {valid_text}.",
             }
 
         if year not in pending["valid_years"]:
-            valid_text = ", ".join(self._sort_fiscal_years_desc(pending["valid_years"]))
+            valid_text = ", ".join(
+                self._sort_fiscal_years_desc(pending["valid_years"])
+            )
             return {
                 "error": f"I currently have data for {valid_text}. Please choose one of those.",
             }
@@ -400,9 +405,11 @@ Answer:
         query = query.strip()
 
         if not query:
-            return { "error": "Please enter a question."}
+            return {"error": "Please enter a question."}
 
-        pending_company_resolution = self._handle_pending_company_clarification(query)
+        pending_company_resolution = self._handle_pending_company_clarification(
+            query
+        )
         if pending_company_resolution:
             if "resolved_query" in pending_company_resolution:
                 query = pending_company_resolution["resolved_query"]
@@ -417,7 +424,9 @@ Answer:
                 return pending_year_resolution
 
         if self._needs_company_clarification(query):
-            self.memory["pending_company_clarification"] = {"original_query": query}
+            self.memory["pending_company_clarification"] = {
+                "original_query": query
+            }
 
             return {
                 "error": (
@@ -442,7 +451,9 @@ Answer:
 
         self._update_memory(query)
 
-        result = self.rag.get_context(query, memory_companies=self.memory["companies"])
+        result = self.rag.get_context(
+            query, memory_companies=self.memory["companies"]
+        )
 
         context = result["context"]
         documents = result.get("documents", [])

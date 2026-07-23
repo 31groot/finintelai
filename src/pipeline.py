@@ -1,7 +1,7 @@
 from src.features.rag import RAGPipeline
-_rag: RAGPipeline = None
+_rag = None
 
-def get_pipeline() -> RAGPipeline:
+def get_pipeline():
     global _rag
     if _rag is None:
         _rag = RAGPipeline()
