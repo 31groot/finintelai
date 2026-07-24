@@ -68,9 +68,8 @@ def _parse_verification_response(raw: str) -> dict:
 
 def run_verification_agent(state: AgentState) -> AgentState:
     draft_answer = state.get("draft_answer", "")
-    evidence = state.get("evidence", {})
+    evidence = state.get("evidence") or {}
     context = evidence.get("context", "")
-    retry_count = state.get("retry_count", 0)
 
     if not draft_answer or not context:
         return {
@@ -80,17 +79,6 @@ def run_verification_agent(state: AgentState) -> AgentState:
                 "confidence": 0.0,
                 "unverified_claims": ["Missing draft answer or context."],
                 "reason": "Verification skipped — input incomplete.",
-            },
-        }
-
-    if retry_count >= MAX_RETRIES:
-        return {
-            **state,
-            "verification": {
-                "grounded": False,
-                "confidence": 0.0,
-                "unverified_claims": [],
-                "reason": "Max retries exceeded. Answer may be unverified.",
             },
         }
 
@@ -128,13 +116,13 @@ def run_verification_agent(state: AgentState) -> AgentState:
 
 
 def check_grounding(state: AgentState) -> str:
-    verification = state.get("verification", {})
+    verification = state.get("verification") or {}
     retry_count = state.get("retry_count", 0)
 
     if verification.get("grounded"):
         return "grounded"
 
     if retry_count >= MAX_RETRIES:
-        return "grounded"
+        return "give_up"
 
     return "retry"

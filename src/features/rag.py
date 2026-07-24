@@ -190,8 +190,6 @@ class RAGPipeline:
         if any(keyword in q for keyword in commentary_keywords):
             return ["management_commentary"]
 
-        # Quarterly information may come from presentations, earnings calls, or
-        # annual reports, so avoid restricting source_kind here.
         if has_quarter_signal:
             return None
 
@@ -210,8 +208,9 @@ class RAGPipeline:
 
         return None
 
+
     def _extract_basis(self, query):
-    
+
         q = query.lower()
 
         if any(term in q for term in constant_currency_query_terms):
@@ -223,7 +222,7 @@ class RAGPipeline:
         return None
 
     def _extract_figure_type(self, query):
-       
+ 
         q = query.lower()
 
         if any(term in q for term in guidance_query_terms):
@@ -475,7 +474,15 @@ class RAGPipeline:
 
         return [], []
 
-    def get_context(self, query, memory_companies=None):
+    BROADENABLE_FILTERS = ("doc_types", "source_kinds", "basis", "figure_type")
+
+    def _broaden_filters(self, filters):
+        broadened = dict(filters)
+        for key in self.BROADENABLE_FILTERS:
+            broadened.pop(key, None)
+        return broadened
+
+    def get_context(self, query, memory_companies=None, broaden=False):
         decomposed = self.decomposer.decompose(query, memory_companies=memory_companies)
 
         if isinstance(decomposed, dict):
@@ -498,8 +505,14 @@ class RAGPipeline:
                 statement_type=statement_type,
             )
 
+            if broaden:
+                filters = self._broaden_filters(filters)
+
+            base_n_results = 24 if is_comparison else 20
+            n_results = base_n_results * 2 if broaden else base_n_results
+
             results = self.retriever.search(
-                query=subquery, n_results=24 if is_comparison else 20, filters=filters
+                query=subquery, n_results=n_results, filters=filters
             )
 
             retrieved_docs = results["documents"]
@@ -509,6 +522,7 @@ class RAGPipeline:
 
             docs, metadata = self._relax_filters_stepwise(docs, metadata, filters)
 
+    
             has_strict_filter = bool(
                 filters.get("fiscal_years")
                 or filters.get("quarters")
@@ -524,12 +538,13 @@ class RAGPipeline:
             if not docs:
                 continue
 
-            rerank_top_k = min(
-                self._get_rerank_top_k(
-                    is_comparison=is_comparison, num_subqueries=len(subqueries)
-                ),
-                len(docs),
+            rerank_top_k = self._get_rerank_top_k(
+                is_comparison=is_comparison, num_subqueries=len(subqueries)
             )
+            if broaden:
+                rerank_top_k = int(rerank_top_k * 1.5)
+
+            rerank_top_k = min(rerank_top_k, len(docs))
 
             top_results = self.reranker.rerank(
                 query=subquery, documents=docs, metadata=metadata, top_k=rerank_top_k

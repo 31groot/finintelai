@@ -8,7 +8,6 @@ _decomposer = QueryDecomposer()
 def run_evidence_agent(state: AgentState) -> AgentState:
     query = state["query"]
     retry_count = state.get("retry_count", 0)
-    existing_evidence = state.get("evidence") or {}
 
     companies = state.get("companies") or []
     metrics = state.get("metrics") or []
@@ -26,18 +25,21 @@ def run_evidence_agent(state: AgentState) -> AgentState:
         quarters = decomposed.get("quarters", [])
         is_comparison = decomposed.get("is_comparison", False)
 
-    rag = get_pipeline()
-    result = rag.get_context(query, memory_companies=companies or None)
+  
+    broaden = retry_count > 0
 
-    preserved_consistency = existing_evidence.get("consistency")
+    rag = get_pipeline()
+    result = rag.get_context(
+        query,
+        memory_companies=companies or None,
+        broaden=broaden,
+    )
 
     evidence = {
         "documents": result.get("documents", []),
         "metadata": result.get("metadata", []),
-        "citations": [],
         "subqueries": result.get("subqueries", []),
         "context": result.get("context", ""),
-        "consistency": preserved_consistency,
     }
 
     return {

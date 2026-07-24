@@ -4,10 +4,8 @@ from typing import Optional, TypedDict
 class Evidence(TypedDict):
     documents: list[str]
     metadata: list[dict]
-    citations: list[str]
     context: str
     subqueries: list[str]
-    consistency: Optional[list]
 
 
 class Verification(TypedDict):
@@ -30,4 +28,3 @@ class AgentState(TypedDict):
     years: list
     quarters: list
     is_comparison: bool
-    needs_cross_source: bool
