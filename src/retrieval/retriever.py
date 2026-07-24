@@ -5,6 +5,9 @@ from src.retrieval.bm25 import BM25Retriever
 RRF_K = 60
 RRF_CANDIDATES = 50
 
+PERMISSIVE_META_VALUES = ("unspecified", "", "general")
+
+
 class Retriever:
     def __init__(self):
         self.embedder = EmbeddingModel()
@@ -55,7 +58,6 @@ class Retriever:
             meta_quarter = str(meta.get("quarter", "")).upper()
             if meta_quarter not in quarters:
                 return False
-            
 
         source_kinds = [s.lower() for s in filters.get("source_kinds", [])]
         if source_kinds:
@@ -67,6 +69,21 @@ class Retriever:
         if statement_type:
             meta_statement_type = str(meta.get("statement_type", "")).lower().strip()
             if meta_statement_type != statement_type:
+                return False
+
+        basis = str(filters.get("basis", "")).lower().strip()
+        if basis:
+            meta_basis = str(meta.get("basis", "")).lower().strip()
+            if meta_basis not in PERMISSIVE_META_VALUES and meta_basis != basis:
+                return False
+
+        figure_type = str(filters.get("figure_type", "")).lower().strip()
+        if figure_type:
+            meta_figure_type = str(meta.get("figure_type", "")).lower().strip()
+            if (
+                meta_figure_type not in PERMISSIVE_META_VALUES
+                and meta_figure_type != figure_type
+            ):
                 return False
 
         return True
@@ -207,6 +224,22 @@ class Retriever:
 
         if result["documents"]:
             return result
+
+        if filters and (filters.get("basis") or filters.get("figure_type")):
+            relaxed_basis_filters = dict(filters)
+            relaxed_basis_filters.pop("basis", None)
+            relaxed_basis_filters.pop("figure_type", None)
+
+            relaxed_basis_result = self._search_once(
+                query=query,
+                n_results=n_results,
+                filters=relaxed_basis_filters,
+            )
+
+            if relaxed_basis_result["documents"]:
+                return relaxed_basis_result
+
+            filters = relaxed_basis_filters
 
         if filters and filters.get("statement_type"):
             relaxed_filters = dict(filters)

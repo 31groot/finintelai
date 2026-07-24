@@ -37,6 +37,42 @@ doc_type_patterns = {
     ],
 }
 
+CONSTANT_CURRENCY_MARKERS = [
+    "constant currency",
+    "constant-currency",
+    "in cc terms",
+    "cc growth",
+    "cc terms",
+    "on a cc basis",
+]
+
+REPORTED_BASIS_MARKERS = [
+    "reported basis",
+    "in reported terms",
+    "reported currency",
+    "as reported",
+]
+
+GUIDANCE_MARKERS = [
+    "guidance",
+    "we expect",
+    "we anticipate",
+    "outlook for",
+    "full year guidance",
+    "revising our guidance",
+    "guidance range",
+    "we are guiding",
+    "forecast for",
+]
+
+ACTUAL_MARKERS = [
+    "for the year ended",
+    "for the quarter ended",
+    "audited",
+    "actuals",
+    "reported revenue of",
+]
+
 CONSOLIDATED_MARKERS = [
     "consolidated statement",
     "consolidated balance sheet",
@@ -54,6 +90,7 @@ STANDALONE_MARKERS = [
     "notes to standalone",
     "standalone statement of changes",
 ]
+
 
 def infer_company_from_source(source_name: str):
     source_lower = source_name.lower()
@@ -103,8 +140,36 @@ def infer_quarter_from_source(source_name: str):
     return None
 
 
-def infer_statement_type(page_text: str):
-    text_lower = page_text.lower()
+def infer_basis(text: str):
+    text_lower = (text or "").lower()
+
+    for marker in CONSTANT_CURRENCY_MARKERS:
+        if marker in text_lower:
+            return "constant_currency"
+
+    for marker in REPORTED_BASIS_MARKERS:
+        if marker in text_lower:
+            return "reported"
+
+    return "unspecified"
+
+
+def infer_figure_type(text: str):
+    text_lower = (text or "").lower()
+
+    for marker in GUIDANCE_MARKERS:
+        if marker in text_lower:
+            return "guidance"
+
+    for marker in ACTUAL_MARKERS:
+        if marker in text_lower:
+            return "actual"
+
+    return "unspecified"
+
+
+def infer_statement_type(text: str):
+    text_lower = (text or "").lower()
 
     for marker in CONSOLIDATED_MARKERS:
         if marker in text_lower:
@@ -117,6 +182,18 @@ def infer_statement_type(page_text: str):
     return "general"
 
 
+def resolve_statement_type(chunk_text_value: str, page_text: str):
+    chunk_level = infer_statement_type(chunk_text_value) if chunk_text_value else "general"
+
+    if chunk_level != "general":
+        return chunk_level
+
+    if page_text:
+        return infer_statement_type(page_text)
+
+    return "general"
+
+
 def infer_source_kind(doc_type: str):
     if doc_type == "annual_report":
         return "annual_filing"
@@ -125,6 +202,7 @@ def infer_source_kind(doc_type: str):
     if doc_type == "earnings_call":
         return "management_commentary"
     return "general"
+
 
 def parse_source_metadata(source_name: str):
     doc_type = infer_doc_type_from_source(source_name)
@@ -145,7 +223,6 @@ def build_source_id(source_meta):
     quarter = (source_meta.get("quarter") or "").lower()
     doc_type = source_meta.get("doc_type") or ""
 
-
     parts = [company, fiscal_year]
     if quarter:
         parts.append(quarter)
@@ -160,8 +237,12 @@ def build_chunk_metadata(
     page=None,
     chunk_type="text",
     page_text="",
-    extra=None
+    chunk_text_value="",
+    extra=None,
 ):
+    chunk_text_value = chunk_text_value or ""
+    page_text = page_text or ""
+
     metadata = {
         "source": source_meta.get("source") or "",
         "company": source_meta.get("company") or "",
@@ -171,31 +252,37 @@ def build_chunk_metadata(
         "quarter": source_meta.get("quarter") or "",
         "page": page if page is not None else -1,
         "chunk_type": chunk_type or "",
-        "statement_type": infer_statement_type(page_text) if page_text else "general",
+        "statement_type": resolve_statement_type(chunk_text_value, page_text),
+        "basis": infer_basis(chunk_text_value),
+        "figure_type": infer_figure_type(chunk_text_value),
     }
-    
-    # If there are additional parser-specific metadata fields, merge them in
+
     if extra and isinstance(extra, dict):
         metadata.update(extra)
-        
+
     return metadata
 
 
-def normalize_table_metadata(table_metadata_list, source_meta):
+def normalize_table_metadata(table_metadata_list, source_meta, table_chunks=None):
     normalized = []
 
-    for meta in table_metadata_list:
+    for idx, meta in enumerate(table_metadata_list):
         extra = meta.copy()
 
         page = extra.pop("page", None)
         extra.pop("source", None)
         extra.pop("chunk_type", None)
 
+        chunk_text_value = ""
+        if table_chunks and idx < len(table_chunks):
+            chunk_text_value = table_chunks[idx] or ""
+
         normalized.append(
             build_chunk_metadata(
                 source_meta=source_meta,
                 page=page,
                 chunk_type="table",
+                chunk_text_value=chunk_text_value,
                 extra=extra,
             )
         )
@@ -212,8 +299,7 @@ def main():
 
     all_chunks = []
     all_metadata = []
-    
-    # Change 1: Create the VectorStore once at initialization
+
     store = VectorStore()
 
     for pdf_path in pdf_files:
@@ -221,7 +307,6 @@ def main():
         source_meta = parse_source_metadata(source_name)
         source_meta["source"] = build_source_id(source_meta)
 
-        # Change 2: Check if this source ID is already indexed, skip if True
         if store.source_exists(source_meta["source"]):
             print(f"\nSkipping {source_meta['source']} (already indexed)")
             continue
@@ -250,6 +335,7 @@ def main():
                         page=page_num,
                         chunk_type="text",
                         page_text=page_text,
+                        chunk_text_value=chunk,
                     )
                 )
 
@@ -260,7 +346,9 @@ def main():
         print(f"Tables found: {len(tables)}")
 
         table_chunks, table_metadata = chunk_tables(tables, source_meta["source"])
-        table_metadata = normalize_table_metadata(table_metadata, source_meta)
+        table_metadata = normalize_table_metadata(
+            table_metadata, source_meta, table_chunks
+        )
 
         print(f"Table chunks: {len(table_chunks)}")
 
@@ -271,7 +359,6 @@ def main():
 
         print(f"Running total chunks: {len(all_chunks)}")
 
-    # Check if we actually found any new documents to index before generating embeddings
     if not all_chunks:
         print("\n" + "=" * 60)
         print("No new documents to index. Vector store is up to date!")
@@ -286,7 +373,6 @@ def main():
     embeddings = embedder.embed(all_chunks)
     print(f"Embeddings shape: {embeddings.shape}")
 
-    # Change 3: Directly add the new items into the existing store (No reset, no re-initialization)
     print("\nSaving to ChromaDB...")
     store.add_documents(all_chunks, embeddings, all_metadata)
     print(f"Total documents in DB: {store.count()}")

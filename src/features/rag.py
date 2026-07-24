@@ -18,19 +18,19 @@ compare_keywords = [
 ]
 
 quarterly_signals = [
-            "q1",
-            "q2",
-            "q3",
-            "q4",
-            "quarter 1",
-            "quarter 2",
-            "quarter 3",
-            "quarter 4",
-            "earnings call",
-            "conference call",
-            "transcript",
-            "investor presentation",
-            "presentation",
+    "q1",
+    "q2",
+    "q3",
+    "q4",
+    "quarter 1",
+    "quarter 2",
+    "quarter 3",
+    "quarter 4",
+    "earnings call",
+    "conference call",
+    "transcript",
+    "investor presentation",
+    "presentation",
 ]
 
 quarter_patterns = {
@@ -57,40 +57,77 @@ metric_keywords = [
 ]
 
 commentary_keywords = [
-            "management",
-            "commentary",
-            "said",
-            "saying",
-            "call transcript",
-            "transcript",
-            "conference call",
-            "earnings call",
+    "management",
+    "commentary",
+    "said",
+    "saying",
+    "call transcript",
+    "transcript",
+    "conference call",
+    "earnings call",
 ]
 
 metric_keywords_local = [
-            "margin",
-            "revenue",
-            "growth",
-            "attrition",
-            "headcount",
-            "employee",
-            "employees",
-            "cash flow",
-            "free cash flow",
-            "client",
-            "geography",
-            "segment",
-            "vertical",
-            "deal",
-            "deals",
-            "guidance",
-            "operating margin",
-            "profit",
-            "ebitda",
-        ]
+    "margin",
+    "revenue",
+    "growth",
+    "attrition",
+    "headcount",
+    "employee",
+    "employees",
+    "cash flow",
+    "free cash flow",
+    "client",
+    "geography",
+    "segment",
+    "vertical",
+    "deal",
+    "deals",
+    "guidance",
+    "operating margin",
+    "profit",
+    "ebitda",
+]
+
+constant_currency_query_terms = [
+    "constant currency",
+    "constant-currency",
+    "cc terms",
+    "cc growth",
+    "in cc",
+]
+
+reported_basis_query_terms = [
+    "reported basis",
+    "reported terms",
+    "as reported",
+    "in reported",
+]
+
+guidance_query_terms = [
+    "guidance",
+    "outlook",
+    "forecast",
+    "guided",
+    "expects",
+    "expected to grow",
+    "projection",
+    "projections",
+]
+
+actual_query_terms = [
+    "actual",
+    "actuals",
+    "reported results",
+    "what was",
+    "how much did",
+]
+
+PERMISSIVE_META_VALUES = ("unspecified", "", "general")
+
 
 class RAGPipeline:
-            
+
     def __init__(self):
         self.retriever = Retriever()
         self.reranker = Reranker()
@@ -153,9 +190,8 @@ class RAGPipeline:
         if any(keyword in q for keyword in commentary_keywords):
             return ["management_commentary"]
 
-
-# Quarterly information may come from presentations, earnings calls, or annual reports, so avoid restricting source_kind here.
-
+        # Quarterly information may come from presentations, earnings calls, or
+        # annual reports, so avoid restricting source_kind here.
         if has_quarter_signal:
             return None
 
@@ -171,7 +207,31 @@ class RAGPipeline:
             return "standalone"
         if "consolidated" in q:
             return "consolidated"
-        
+
+        return None
+
+    def _extract_basis(self, query):
+    
+        q = query.lower()
+
+        if any(term in q for term in constant_currency_query_terms):
+            return "constant_currency"
+
+        if any(term in q for term in reported_basis_query_terms):
+            return "reported"
+
+        return None
+
+    def _extract_figure_type(self, query):
+       
+        q = query.lower()
+
+        if any(term in q for term in guidance_query_terms):
+            return "guidance"
+
+        if any(term in q for term in actual_query_terms):
+            return "actual"
+
         return None
 
     def _is_comparison_query(self, query):
@@ -210,10 +270,14 @@ class RAGPipeline:
 
         return True
 
-    def _build_filters_for_subquery( self, query, subquery, memory_companies=None, statement_type=None):
+    def _build_filters_for_subquery(
+        self, query, subquery, memory_companies=None, statement_type=None
+    ):
         filters = {}
 
-        companies = self._get_companies_for_subquery(subquery, fallback_companies=memory_companies)
+        companies = self._get_companies_for_subquery(
+            subquery, fallback_companies=memory_companies
+        )
         if companies:
             filters["companies"] = companies
 
@@ -244,6 +308,16 @@ class RAGPipeline:
         if statement_type and not filters.get("quarters"):
             filters["statement_type"] = statement_type
 
+        basis = self._extract_basis(subquery) or self._extract_basis(query)
+        if basis:
+            filters["basis"] = basis
+
+        figure_type = self._extract_figure_type(subquery) or self._extract_figure_type(
+            query
+        )
+        if figure_type:
+            filters["figure_type"] = figure_type
+
         return filters
 
     def _apply_local_filters(self, docs, metadata, filters):
@@ -259,6 +333,8 @@ class RAGPipeline:
         quarter_filters = [q.upper() for q in filters.get("quarters", [])]
         source_kind_filters = [s.lower() for s in filters.get("source_kinds", [])]
         statement_type_filter = str(filters.get("statement_type", "")).lower().strip()
+        basis_filter = str(filters.get("basis", "")).lower().strip()
+        figure_type_filter = str(filters.get("figure_type", "")).lower().strip()
 
         for doc, meta in zip(docs, metadata):
             meta = meta or {}
@@ -302,6 +378,18 @@ class RAGPipeline:
                 if meta_statement_type != statement_type_filter:
                     keep = False
 
+            if keep and basis_filter:
+                meta_basis = str(meta.get("basis", "")).lower().strip()
+                if meta_basis not in PERMISSIVE_META_VALUES:
+                    if meta_basis != basis_filter:
+                        keep = False
+
+            if keep and figure_type_filter:
+                meta_figure_type = str(meta.get("figure_type", "")).lower().strip()
+                if meta_figure_type not in PERMISSIVE_META_VALUES:
+                    if meta_figure_type != figure_type_filter:
+                        keep = False
+
             if keep:
                 filtered_docs.append(doc)
                 filtered_metadata.append(meta)
@@ -336,11 +424,22 @@ class RAGPipeline:
         return 6
 
     def _relax_filters_stepwise(self, docs, metadata, filters):
+
         strict_docs, strict_meta = self._apply_local_filters(docs, metadata, filters)
         if strict_docs:
             return strict_docs, strict_meta
 
-        relaxed = dict(filters)
+        relaxed0 = dict(filters)
+        relaxed0.pop("basis", None)
+        relaxed0.pop("figure_type", None)
+
+        relaxed_docs0, relaxed_meta0 = self._apply_local_filters(
+            docs, metadata, relaxed0
+        )
+        if relaxed_docs0:
+            return relaxed_docs0, relaxed_meta0
+
+        relaxed = dict(relaxed0)
         relaxed.pop("source_kinds", None)
 
         relaxed_docs, relaxed_meta = self._apply_local_filters(docs, metadata, relaxed)
@@ -376,7 +475,6 @@ class RAGPipeline:
 
         return [], []
 
-
     def get_context(self, query, memory_companies=None):
         decomposed = self.decomposer.decompose(query, memory_companies=memory_companies)
 
@@ -388,7 +486,6 @@ class RAGPipeline:
             statement_type = self._extract_statement_type(query)
 
         is_comparison = self._is_comparison_query(query)
-        # is_financial_kpi = self._is_financial_kpi_query(query, subqueries)
 
         balanced_docs = []
         balanced_metadata = []
