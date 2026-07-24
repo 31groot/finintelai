@@ -16,9 +16,9 @@ def run_evidence_agent(state: AgentState) -> AgentState:
     quarters = state.get("quarters") or []
     is_comparison = state.get("is_comparison") or False
 
-    if not companies and not metrics:
+    if retry_count == 0:
         decomposed = _decomposer.decompose(query)
-        companies = decomposed.get("companies", [])
+        companies = decomposed.get("companies", []) or companies
         metrics = decomposed.get("metrics", [])
         topics = decomposed.get("topics", [])
         years = decomposed.get("years", [])
