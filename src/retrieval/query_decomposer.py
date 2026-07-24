@@ -38,7 +38,6 @@ comparison_words = [
 description_words = [
     "what does",
     "business",
-    "do",
     "overview",
 ]
 
