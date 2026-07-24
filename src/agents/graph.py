@@ -70,7 +70,11 @@ def run_finalize(state: AgentState) -> AgentState:
         if citations else ""
     )
 
-    confidence = verification.get("confidence")
+    try:
+        confidence = float(verification.get("confidence"))
+    except (TypeError, ValueError):
+        confidence = None
+
     confidence_block = (
         f"\n\n[Confidence: {round(confidence * 100)}%]"
         if confidence is not None else ""
