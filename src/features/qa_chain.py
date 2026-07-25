@@ -1,6 +1,6 @@
 import re
 from dotenv import load_dotenv
-from groq import Groq, GroqError
+from src.llm.client import client
 from src.features.rag import RAGPipeline
 from src.retrieval.query_decomposer import company_aliases
 
@@ -57,7 +57,7 @@ class QAChain:
 
     def __init__(self):
         self.rag = RAGPipeline()
-        self.client = Groq()
+        self.client = client
         self.memory = {
             "companies": [],
             "pending_year_clarification": None,
@@ -303,17 +303,17 @@ Answer:
 
     def _generate_answer(self, prompt):
         try:
-            response = self.client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0,
+            response = self.client.responses.create(
+                model=os.getenv("AZURE_OPENAI_DEPLOYMENT"),
+                input=prompt,
             )
-            return response.choices[0].message.content, None
-        except GroqError as e:
+            return response.output_text, None
+        except Exception as e:
             return None, (
                 "Sorry, I couldn't reach the AI service right now "
                 f"({type(e).__name__}). Please try again in a moment."
             )
+    
 
     def _format_citations(self, sources, max_sources=15):
         if not sources:

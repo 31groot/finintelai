@@ -42,18 +42,22 @@ quarter_patterns = {
 
 metric_keywords = [
     "revenue",
+    "growth"
     "profit",
+    "headcount"
     "ebitda",
     "margin",
     "attrition",
     "headcount",
     "employees",
     "employee",
+    "bookings"
     "tcv",
     "guidance",
     "deal",
     "deals",
-    "growth",
+    "cash flow"
+
 ]
 
 commentary_keywords = [
@@ -119,8 +123,6 @@ actual_query_terms = [
     "actual",
     "actuals",
     "reported results",
-    "what was",
-    "how much did",
 ]
 
 PERMISSIVE_META_VALUES = ("unspecified", "", "general")
@@ -371,10 +373,8 @@ class RAGPipeline:
                     keep = False
 
             if keep and statement_type_filter:
-                meta_statement_type = (
-                    str(meta.get("statement_type", "")).lower().strip()
-                )
-                if meta_statement_type != statement_type_filter:
+                meta_statement_type = str(meta.get("statement_type", "")).lower().strip()
+                if meta_statement_type not in (statement_type_filter, "general", ""):
                     keep = False
 
             if keep and basis_filter:
