@@ -1,0 +1,75 @@
+[
+  {
+    "id": "tcs_001",
+    "category": "single_fact",
+    "company": "tcs",
+    "answerable": true,
+    "retry_count": 1,
+    "grounded": true,
+    "answer": "Company: TCS\nMetric: Consolidated Revenue from Operations\nValue: 267,021\nReporting period: FY 2026\nUnit/Currency: H crore\nExplanation: The consolidated revenue from operations for TCS in FY26 was 267,021 H crore.\n\nSources:\n- tcs_fy26_annual_report (page 58)\n- tcs_fy26_annual_report (page 313)\n- tcs_fy26_annual_report (page 231)\n- tcs_fy26_annual_report (page 234)\n- tcs_fy26_annual_report (page 157)\n- tcs_fy26_annual_report (page 230)\n- tcs_fy26_annual_report (page 309)\n- tcs_fy26_annual_report (page 236)\n- tcs_fy26_annual_report (page 319)\n\n[Confidence: 100%]",
+    "correct": true,
+    "detail": "expected 267021 found",
+    "source_hit": false
+  },
+  {
+    "id": "tcs_003",
+    "category": "single_fact",
+    "company": "tcs",
+    "answerable": true,
+    "retry_count": 1,
+    "grounded": true,
+    "answer": "Not available in the retrieved context.\n\nSources:\n- tcs_fy26_annual_report (page 58)\n- tcs_fy26_annual_report (page 313)\n- tcs_fy26_annual_report (page 231)\n- tcs_fy26_annual_report (page 234)\n- tcs_fy26_annual_report (page 157)\n- tcs_fy26_annual_report (page 230)\n- tcs_fy26_q2_earnings_call (page 36)\n- tcs_fy26_q2_earnings_call (page 4)\n- tcs_fy26_q1_earnings_call (page 4)\n- tcs_fy26_q1_earnings_call (page 15)\n- tcs_fy26_q1_earnings_call (page 6)\n- tcs_fy26_q1_earnings_call (page 7)\n- tcs_fy26_q2_earnings_call (page 3)\n- tcs_fy26_annual_report (page 27)\n- tcs_fy26_annual_report (page 263)\n- tcs_fy26_annual_report (page 232)\n- tcs_fy26_annual_report (page 5)\n- tcs_fy26_annual_report (page 322)\n- tcs_fy26_annual_report (page 258)\n\n[Confidence: 100%]",
+    "correct": false,
+    "detail": "expected 584519 MISSING",
+    "source_hit": false
+  },
+  {
+    "id": "infosys_006",
+    "category": "single_year_fact",
+    "company": "infosys",
+    "answerable": true,
+    "retry_count": 2,
+    "grounded": false,
+    "answer": "Sorry, I couldn't reach the AI service right now (RateLimitError). Please try again in a moment.\n\nSources:\n- infosys_fy26_annual_report (page 287)\n- infosys_fy26_annual_report (page 33)\n- infosys_fy26_q1_investor_presentation (page 3)\n- infosys_fy26_q3_investor_presentation (page 3)\n- infosys_fy26_annual_report (page 274)\n- infosys_fy26_q4_investor_presentation (page 3)\n- infosys_fy26_q4_investor_presentation (page 5)\n- infosys_fy26_q4_investor_presentation (page 6)\n- infosys_fy26_annual_report (page 78)\n- infosys_fy26_annual_report (page 254)\n- infosys_fy26_q4_investor_presentation (page 4)\n- infosys_fy26_annual_report (page 81)\n- infosys_fy26_annual_report (page 351)\n- infosys_fy26_q3_investor_presentation (page 5)\n- infosys_fy26_annual_report (page 35)\n- infosys_fy26_annual_report (page 276)\n- infosys_fy26_annual_report (page 352)\n\n[Confidence: 0%]\n  Note: Verification unavailable — LLM call failed (RateLimitError).",
+    "correct": false,
+    "detail": "expected 178650 MISSING",
+    "source_hit": false
+  },
+  {
+    "id": "wipro_001",
+    "category": "single_fact",
+    "company": "wipro",
+    "answerable": true,
+    "retry_count": 2,
+    "grounded": false,
+    "answer": "Sorry, I couldn't reach the AI service right now (RateLimitError). Please try again in a moment.\n\nSources:\n- wipro_fy26_annual_report (page 274)\n- wipro_fy26_annual_report (page 356)\n- wipro_fy26_annual_report (page 298)\n- wipro_fy26_annual_report (page 464)\n- wipro_fy26_annual_report (page 284)\n- wipro_fy26_annual_report (page 396)\n- wipro_fy26_annual_report (page 448)\n- wipro_fy26_annual_report (page 398)\n- wipro_fy26_annual_report (page 410)\n- wipro_fy26_annual_report (page 290)\n- wipro_fy26_annual_report (page 400)\n- wipro_fy26_annual_report (page 354)\n- wipro_fy26_annual_report (page 454)\n- wipro_fy26_annual_report (page 390)\n- wipro_fy26_annual_report (page 456)\n- wipro_fy26_annual_report (page 310)\n- wipro_fy26_annual_report (page 379)\n\n[Confidence: 0%]\n  Note: Verification unavailable — LLM call failed (RateLimitError).",
+    "correct": false,
+    "detail": "expected 132655 MISSING",
+    "source_hit": false
+  },
+  {
+    "id": "cmp_001",
+    "category": "comparison",
+    "company": "multi",
+    "answerable": true,
+    "retry_count": 2,
+    "grounded": false,
+    "answer": "Sorry, I couldn't reach the AI service right now (RateLimitError). Please try again in a moment.\n\nSources:\n- tcs_fy26_annual_report (page 58)\n- tcs_fy26_annual_report (page 313)\n- tcs_fy26_annual_report (page 231)\n- tcs_fy26_annual_report (page 234)\n- tcs_fy26_annual_report (page 35)\n- tcs_fy26_annual_report (page 157)\n- tcs_fy26_annual_report (page 174)\n- tcs_fy26_q1_earnings_call (page 3)\n- tcs_fy26_annual_report (page 230)\n- tcs_fy26_annual_report (page 232)\n- tcs_fy26_annual_report (page 310)\n- tcs_fy26_annual_report (page 258)\n- infosys_fy26_annual_report (page 287)\n- infosys_fy26_annual_report (page 33)\n- infosys_fy26_q1_investor_presentation (page 3)\n- infosys_fy26_q3_investor_presentation (page 3)\n- infosys_fy26_annual_report (page 274)\n- infosys_fy26_q4_investor_presentation (page 3)\n- infosys_fy26_q4_investor_presentation (page 5)\n- infosys_fy26_q4_investor_presentation (page 6)\n- infosys_fy26_annual_report (page 78)\n- infosys_fy26_annual_report (page 254)\n- infosys_fy26_q4_investor_presentation (page 4)\n- infosys_fy26_annual_report (page 356)\n- infosys_fy26_annual_report (page 81)\n- infosys_fy26_annual_report (page 351)\n- infosys_fy26_q3_investor_presentation (page 5)\n\n[Confidence: 0%]\n  Note: Verification unavailable — LLM call failed (RateLimitError).",
+    "correct": false,
+    "detail": "0/2 values present",
+    "source_hit": false
+  },
+  {
+    "id": "una_001",
+    "category": "unanswerable",
+    "company": "tcs",
+    "answerable": false,
+    "retry_count": 2,
+    "grounded": false,
+    "answer": "Sorry, I couldn't reach the AI service right now (RateLimitError). Please try again in a moment.\n\n[Confidence: 0%]\n\n[Unverified claims:]\n  - Missing draft answer or context.\n  Note: Verification skipped — input incomplete.",
+    "correct": false,
+    "hallucinated": true,
+    "detail": "FABRICATED an answer",
+    "source_hit": null
+  }
+]

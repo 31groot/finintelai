@@ -1,0 +1,78 @@
+[
+  {
+    "id": "tcs_001",
+    "company": "tcs",
+    "category": "single_fact",
+    "question": "What was TCS consolidated revenue from operations in FY26?",
+    "expected_answer": "267021",
+    "expected_unit": "INR crore",
+    "expected_source": "tcs_fy26_annual_report",
+    "expected_page": 36,
+    "note": "consolidated",
+    "answerable": true
+  },
+  {
+    "id": "tcs_003",
+    "company": "tcs",
+    "category": "single_fact",
+    "question": "What was TCS closing headcount for FY26?",
+    "expected_answer": "584519",
+    "expected_unit": "employees",
+    "expected_source": "tcs_fy26_annual_report",
+    "expected_page": 69,
+    "note": "FY26 is the first column of the ten-year performance trend table",
+    "answerable": true
+  },
+  {
+    "id": "infosys_006",
+    "company": "infosys",
+    "category": "single_year_fact",
+    "question": "What was Infosys revenue in FY26?",
+    "expected_answer": "178650",
+    "expected_unit": "INR crore",
+    "expected_source": "infosys_fy26_annual_report",
+    "expected_page": 16,
+    "note": "consolidated IFRS; FY26 is the first column",
+    "answerable": true
+  },
+  {
+    "id": "wipro_001",
+    "company": "wipro",
+    "category": "single_fact",
+    "question": "What was Wipro's consolidated net profit in FY26?",
+    "expected_answer": "132655",
+    "expected_unit": "INR million",
+    "expected_source": "wipro_fy26_annual_report",
+    "expected_page": 96,
+    "note": "consolidated, total company (not IT Services segment). Verified: 132655/132180 = +0.36% as stated",
+    "answerable": true
+  },
+  {
+    "id": "cmp_001",
+    "company": "multi",
+    "category": "comparison",
+    "question": "Compare TCS and Infosys revenue in FY26.",
+    "expected_answer": [
+      "267021",
+      "178650"
+    ],
+    "answer_type": "multi_value",
+    "expected_unit": "INR crore",
+    "expected_source": [
+      "tcs_fy26_annual_report",
+      "infosys_fy26_annual_report"
+    ],
+    "note": "TCS consolidated revenue from operations vs Infosys consolidated IFRS revenue. Both verified in tcs_001 and infosys_006",
+    "answerable": true
+  },
+  {
+    "id": "una_001",
+    "company": "tcs",
+    "category": "unanswerable",
+    "question": "What was TCS revenue in FY23?",
+    "expected_answer": null,
+    "expected_source": null,
+    "note": "corpus contains FY24-FY26 annual reports only. FY23 figures appear as comparatives in some tables but no FY23 report is indexed. Correct behaviour is to state the information is not available, or to answer only from an explicitly labelled comparative",
+    "answerable": false
+  }
+]
