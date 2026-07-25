@@ -68,7 +68,7 @@ class Retriever:
         statement_type = str(filters.get("statement_type", "")).lower().strip()
         if statement_type:
             meta_statement_type = str(meta.get("statement_type", "")).lower().strip()
-            if meta_statement_type != statement_type:
+            if meta_statement_type not in (statement_type, "general", ""):
                 return False
 
         basis = str(filters.get("basis", "")).lower().strip()

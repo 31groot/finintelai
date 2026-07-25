@@ -42,15 +42,31 @@ description_words = [
 ]
 
 metric_keywords = [
-    "attrition",
+    "revenue",
+    "growth"
     "profit",
+    "headcount"
     "ebitda",
     "margin",
-    "revenue",
-    "growth",
+    "attrition",
+    "headcount",
+    "employees",
+    "employee",
+    "bookings"
+    "tcv",
+    "guidance",
+    "deal",
+    "deals",
+    "cash flow"
 ]
 
 metric_retrieval_map = {
+
+    "headcount": "headcount total employees closing headcount workforce number of employees employee count",
+    "employees": "headcount total employees closing headcount workforce number of employees",
+    "tcv": "total contract value TCV order book bookings deal value new deals",
+    "bookings": "total bookings order book TCV bookings for the quarter deal bookings",
+    "cash flow": "free cash flow operating cash flow cash generated from operations",
     "revenue": "revenue consolidated revenue from operations total income turnover sales consolidated financial statements",
     "growth": (
         "revenue growth "
