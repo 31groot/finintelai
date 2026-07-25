@@ -1,7 +1,7 @@
 import time
 
 from dotenv import load_dotenv
-from groq import Groq, GroqError
+from src.llm.client import client
 from langgraph.graph import StateGraph, END
 
 from src.agents.state import AgentState
@@ -11,7 +11,7 @@ from src.features.qa_chain import QAChain
 
 load_dotenv()
 
-_client = Groq()
+_client = client
 _qa = QAChain.__new__(QAChain)
 _qa.client = _client
 
@@ -26,14 +26,13 @@ def run_generate_answer(state: AgentState) -> AgentState:
     answer = None
     for attempt in range(3):
         try:
-            response = _client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0,
+            response = _client.responses.create(
+                model=os.getenv("AZURE_OPENAI_DEPLOYMENT"),
+                input=prompt,
             )
-            answer = response.choices[0].message.content
+            answer = response.output_text
             break
-        except GroqError as e:
+        except Exception as e:
             if attempt < 2:
                 time.sleep(2 ** attempt)
             else:
@@ -133,7 +132,7 @@ def build_graph():
 pipeline = build_graph()
 
 
-def run(query: str, companies: list = None) -> dict:
+def run(query: str, companies: list = None):
     initial_state: AgentState = {
         "query": query,
         "evidence": None,

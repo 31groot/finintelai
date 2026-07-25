@@ -3,7 +3,7 @@ import re
 import time
 
 from dotenv import load_dotenv
-from groq import Groq, GroqError
+from src.llm.client import client
 
 from src.agents.state import AgentState
 
@@ -11,7 +11,7 @@ load_dotenv()
 
 MAX_RETRIES = 2
 
-_client = Groq()
+_client = client
 
 VERIFICATION_PROMPT = """
 You are a strict financial fact-checker.
@@ -49,7 +49,7 @@ Retrieved Context:
 """
 
 
-def _parse_verification_response(raw: str) -> dict:
+def _parse_verification_response(raw: str):
     raw = raw.strip()
     json_match = re.search(r"\{.*\}", raw, re.DOTALL)
     if json_match:
@@ -65,8 +65,7 @@ def _parse_verification_response(raw: str) -> dict:
         "reason": "Parser failed to extract JSON from LLM response.",
     }
 
-
-def run_verification_agent(state: AgentState) -> AgentState:
+def run_verification_agent(state: AgentState):
     draft_answer = state.get("draft_answer", "")
     evidence = state.get("evidence") or {}
     context = evidence.get("context", "")
@@ -87,18 +86,16 @@ def run_verification_agent(state: AgentState) -> AgentState:
         context=context,
     )
 
+    verification = None
     for attempt in range(3):
         try:
-            response = _client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0,
+            response = _client.responses.create(
+                model=os.getenv("AZURE_OPENAI_DEPLOYMENT"),
+                input=prompt,
             )
-            verification = _parse_verification_response(
-                response.choices[0].message.content
-            )
+            verification = _parse_verification_response(response.output_text)
             break
-        except GroqError as e:
+        except Exception as e:
             if attempt < 2:
                 time.sleep(2 ** attempt)
             else:
@@ -114,8 +111,7 @@ def run_verification_agent(state: AgentState) -> AgentState:
         "verification": verification,
     }
 
-
-def check_grounding(state: AgentState) -> str:
+def check_grounding(state: AgentState):
     verification = state.get("verification") or {}
     retry_count = state.get("retry_count", 0)
 

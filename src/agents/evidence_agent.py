@@ -8,7 +8,6 @@ _decomposer = QueryDecomposer()
 def run_evidence_agent(state: AgentState) -> AgentState:
     query = state["query"]
     retry_count = state.get("retry_count", 0)
-
     companies = state.get("companies") or []
     metrics = state.get("metrics") or []
     topics = state.get("topics") or []
@@ -34,6 +33,7 @@ def run_evidence_agent(state: AgentState) -> AgentState:
         memory_companies=companies or None,
         broaden=broaden,
     )
+
 
     evidence = {
         "documents": result.get("documents", []),
