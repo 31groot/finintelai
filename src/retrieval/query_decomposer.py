@@ -66,7 +66,7 @@ metric_retrieval_map = {
     "tcv": "total contract value TCV order book bookings deal value new deals",
     "bookings": "total bookings order book TCV bookings for the quarter deal bookings",
     "cash flow": "free cash flow operating cash flow cash generated from operations",
-    "revenue": "revenue consolidated revenue from operations total income turnover sales consolidated financial statements",
+    "revenue": "revenue from operations total income turnover sales revenue",
     "growth": (
         "revenue growth "
         "YoY growth "
@@ -77,6 +77,8 @@ metric_retrieval_map = {
         "CC growth "
         "revenue growth percentage"
     ),
+    "standalone": "standalone statement of profit and loss standalone revenue from operations",
+    "operating income": "operating income operating profit results from operating activities EBIT",
     "profit": "consolidated profit after tax consolidated PAT profit attributable to equity holders consolidated net profit net income consolidated statement of profit and loss",
     "ebitda": "consolidated ebitda earnings before interest tax depreciation amortization consolidated operating profit",
     "attrition": "attrition voluntary attrition employee turnover workforce attrition annual attrition rate",
@@ -180,7 +182,13 @@ class QueryDecomposer:
         requested_quarters = self._extract_quarters(query_lower)
 
         needs_consolidated = bool(set(metrics) & FINANCIAL_METRICS)
-        statement_type_filter = "consolidated" if needs_consolidated else None
+
+        if "standalone" in query_lower:
+            statement_type_filter = "standalone"
+        elif needs_consolidated:
+            statement_type_filter = "consolidated"
+        else:
+            statement_type_filter = None
 
         time_suffixes = []
         if requested_years and requested_quarters:
@@ -229,6 +237,7 @@ class QueryDecomposer:
             company = companies[0]
             company_text = company_retrieval_map.get(company, company)
 
+
             if metrics:
                 merged_metrics = list(metrics)
                 if "revenue" in merged_metrics and "growth" in merged_metrics:
@@ -236,6 +245,8 @@ class QueryDecomposer:
 
                 for metric in merged_metrics:
                     metric_text = metric_retrieval_map.get(metric, metric)
+                    if "standalone" in query_lower:                                    
+                        metric_text = metric_retrieval_map["standalone"] + " " + metric_text   
                     for time in time_suffixes:
                         subqueries.append(
                             f"{company_text} {metric_text} {time}".strip()
