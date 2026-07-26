@@ -1,11 +1,10 @@
 from dotenv import load_dotenv
-from openai import AzureOpenAI
+from openai import OpenAI
 import os
 
 load_dotenv()
 
-client = AzureOpenAI(
+client = OpenAI(
+    base_url=os.getenv("AZURE_OPENAI_ENDPOINT"),  
     api_key=os.getenv("AZURE_OPENAI_API_KEY"),
-    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-    api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
 )
