@@ -7,21 +7,18 @@ from langgraph.graph import StateGraph, END
 from src.agents.state import AgentState
 from src.agents.evidence_agent import run_evidence_agent
 from src.agents.verification_agent import run_verification_agent, check_grounding
-from src.features.qa_chain import QAChain
+from src.agents.prompt import _build_prompt
 
 load_dotenv()
 
 _client = client
-_qa = QAChain.__new__(QAChain)
-_qa.client = _client
-
 
 def run_generate_answer(state: AgentState) -> AgentState:
     query = state["query"]
     evidence = state.get("evidence") or {}
     context = evidence.get("context", "")
 
-    prompt = _qa._build_prompt(query, context)
+    prompt = _build_prompt(query, context)
 
     answer = None
     for attempt in range(3):
