@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 from src.llm.client import client
 from src.features.rag import RAGPipeline
 from src.retrieval.query_decomposer import company_aliases
-
+import os 
 load_dotenv()
 
 

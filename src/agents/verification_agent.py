@@ -1,7 +1,7 @@
 import json
 import re
 import time
-
+import os
 from dotenv import load_dotenv
 from src.llm.client import client
 
