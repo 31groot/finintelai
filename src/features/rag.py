@@ -3,6 +3,7 @@ import re
 from src.retrieval.query_decomposer import QueryDecomposer
 from src.retrieval.reranker import Reranker
 from src.retrieval.retriever import Retriever
+from src.retrieval.query_decomposer import metric_keywords
 
 compare_keywords = [
     "compare",
@@ -39,26 +40,6 @@ quarter_patterns = {
     "Q3": [r"\bq3\b", r"\bq\s*3\b", r"\bquarter\s*3\b", r"\bthird quarter\b"],
     "Q4": [r"\bq4\b", r"\bq\s*4\b", r"\bquarter\s*4\b", r"\bfourth quarter\b"],
 }
-
-metric_keywords = [
-    "revenue",
-    "growth"
-    "profit",
-    "headcount"
-    "ebitda",
-    "margin",
-    "attrition",
-    "headcount",
-    "employees",
-    "employee",
-    "bookings"
-    "tcv",
-    "guidance",
-    "deal",
-    "deals",
-    "cash flow"
-
-]
 
 commentary_keywords = [
     "management",

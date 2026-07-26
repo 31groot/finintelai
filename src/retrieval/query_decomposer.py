@@ -43,21 +43,20 @@ description_words = [
 
 metric_keywords = [
     "revenue",
-    "growth"
+    "growth",
     "profit",
-    "headcount"
+    "headcount",
     "ebitda",
     "margin",
     "attrition",
-    "headcount",
     "employees",
     "employee",
-    "bookings"
+    "bookings",
     "tcv",
     "guidance",
     "deal",
     "deals",
-    "cash flow"
+    "cash flow",
 ]
 
 metric_retrieval_map = {
