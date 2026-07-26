@@ -149,6 +149,7 @@ def run(query: str, companies: list = None):
 
     return {
         "ok": True,
+        "metadata": (result.get("evidence") or {}).get("metadata", []),
         "query": result["query"],
         "answer": result.get("final_answer", ""),
         "verification": result.get("verification", {}),

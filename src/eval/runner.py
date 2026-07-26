@@ -84,7 +84,7 @@ def run_question(question, companies_hint=None):
 
     result = run(question["question"], companies=q_companies)
     answer = result.get("answer", "")
-    retrieved = result.get("retrieved_metadata", [])
+    retrieved = result.get("metadata", [])
 
     row = {
         "id": question["id"],
@@ -213,4 +213,4 @@ def main(path, delay=1.0):
 
 if __name__ == "__main__":
     path = sys.argv[1] if len(sys.argv) > 1 else "src/eval/eval_questions.json"
-    main(path, delay=18)
+    main(path,)
