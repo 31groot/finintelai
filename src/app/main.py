@@ -290,7 +290,7 @@ def normalize_table_metadata(table_metadata_list, source_meta, table_chunks=None
     return normalized
 
 
-def main():
+def main(reset=False):
     pdf_files = list(Path("data/raw").rglob("*.pdf"))
 
     if not pdf_files:
@@ -301,6 +301,9 @@ def main():
     all_metadata = []
 
     store = VectorStore()
+    if reset:
+        print("Resetting vector store...")
+        store.reset()
 
     for pdf_path in pdf_files:
         source_name = str(pdf_path).replace("\\", "/")
@@ -379,4 +382,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(reset=True)
