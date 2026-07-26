@@ -126,6 +126,8 @@ actual_query_terms = [
 ]
 
 PERMISSIVE_META_VALUES = ("unspecified", "", "general")
+BROADENABLE_FILTERS = ("doc_types", "source_kinds", "basis", "figure_type")
+
 
 
 class RAGPipeline:
@@ -474,11 +476,9 @@ class RAGPipeline:
 
         return [], []
 
-    BROADENABLE_FILTERS = ("doc_types", "source_kinds", "basis", "figure_type")
-
     def _broaden_filters(self, filters):
         broadened = dict(filters)
-        for key in self.BROADENABLE_FILTERS:
+        for key in BROADENABLE_FILTERS:
             broadened.pop(key, None)
         return broadened
 
