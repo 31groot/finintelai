@@ -1,9 +1,7 @@
 import re
 from dotenv import load_dotenv
-from src.llm.client import client
-from src.features.rag import RAGPipeline
+from src.pipeline import get_pipeline
 from src.retrieval.query_decomposer import company_aliases
-import os 
 load_dotenv()
 
 
@@ -56,8 +54,7 @@ class QAChain:
     ]
 
     def __init__(self):
-        self.rag = RAGPipeline()
-        self.client = client
+        self.rag = get_pipeline()        
         self.memory = {
             "companies": [],
             "pending_year_clarification": None,
@@ -300,44 +297,7 @@ Question:
 
 Answer:
 """
-
-    def _generate_answer(self, prompt):
-        try:
-            response = self.client.responses.create(
-                model=os.getenv("AZURE_OPENAI_DEPLOYMENT"),
-                input=prompt,
-            )
-            return response.output_text, None
-        except Exception as e:
-            return None, (
-                "Sorry, I couldn't reach the AI service right now "
-                f"({type(e).__name__}). Please try again in a moment."
-            )
     
-
-    def _format_citations(self, sources, max_sources=15):
-        if not sources:
-            return ""
-
-        citations = "\n\nSources:\n"
-        seen = set()
-        count = 0
-
-        for item in sources:
-            source = item.get("source", "unknown_source")
-            page = item.get("page", "N/A")
-            key = (source, page)
-
-            if key not in seen:
-                citations += f"- {source} (page {page})\n"
-                seen.add(key)
-                count += 1
-
-            if count >= max_sources:
-                break
-
-        return citations
-
     def _handle_pending_company_clarification(self, query):
         pending = self.memory.get("pending_company_clarification")
         if not pending:
@@ -360,7 +320,7 @@ Answer:
 
         if not companies:
             return {
-                "error": "Please choose a valid company: TCS, Infosys, or Wipro.",
+                "question": "Please choose a valid company: TCS, Infosys, or Wipro.",
             }
 
         company_text = " and ".join(companies)
@@ -383,7 +343,7 @@ Answer:
                 self._sort_fiscal_years_desc(pending["valid_years"])
             )
             return {
-                "error": f"Please choose a valid fiscal year: {valid_text}.",
+                "question": f"Please choose a valid fiscal year: {valid_text}.",
             }
 
         if year not in pending["valid_years"]:
@@ -391,7 +351,7 @@ Answer:
                 self._sort_fiscal_years_desc(pending["valid_years"])
             )
             return {
-                "error": f"I currently have data for {valid_text}. Please choose one of those.",
+                "question": f"I currently have data for {valid_text}. Please choose one of those.",
             }
 
         original_query = pending["original_query"]
@@ -401,11 +361,11 @@ Answer:
         self.memory["pending_year_clarification"] = None
         return {"resolved_query": resolved_query}
 
-    def ask_with_trace(self, query):
+    def resolve(self, query):
         query = query.strip()
 
         if not query:
-            return {"error": "Please enter a question."}
+            return {"question": "Please enter a question."}
 
         pending_company_resolution = self._handle_pending_company_clarification(
             query
@@ -429,7 +389,7 @@ Answer:
             }
 
             return {
-                "error": (
+                "question": (
                     "Which company do you want this for - TCS, Infosys, or Wipro?"
                 ),
             }
@@ -446,43 +406,9 @@ Answer:
             }
 
             return {
-                "error": f"Which fiscal year should I compare — {valid_text}?",
+                "question": f"Which fiscal year should I compare — {valid_text}?",
             }
 
         self._update_memory(query)
 
-        result = self.rag.get_context(
-            query, memory_companies=self.memory["companies"]
-        )
-
-        context = result["context"]
-        documents = result.get("documents", [])
-        metadata = result.get("metadata", [])
-        subqueries = result.get("subqueries", [])
-
-        prompt = self._build_prompt(query, context)
-        answer, error = self._generate_answer(prompt)
-
-        if error:
-            return {"error": error}
-
-        citations = self._format_citations(metadata)
-
-        return {
-            "query": query,
-            "answer": answer,
-            "citations": citations,
-            "documents": documents,
-            "contexts": documents,
-            "metadata": metadata,
-            "subqueries": subqueries,
-            "memory_companies": list(self.memory["companies"]),
-        }
-
-    def ask(self, query):
-        trace = self.ask_with_trace(query)
-
-        if "error" in trace:
-            return trace["error"]
-
-        return trace["answer"] + trace["citations"]
+        return {"query": query, "companies": list(self.memory["companies"])}
