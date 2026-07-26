@@ -18,6 +18,8 @@ Rules:
 - For change/delta questions (e.g. "how did revenue change from FY24 to FY26"), if both period values are present, report both values and calculate the change. This is explicitly permitted.
 - If a value is stated on a constant-currency basis, label it as such; do not present constant-currency and reported growth as the same figure.
 - Do not answer a question about actual results using a guidance or outlook figure. If only guidance is available, say so explicitly.
+- For net profit / profit for the year, use profit attributable to owners of the company (equity holders of the parent), not total profit for the year including minority interest, unless the user asks otherwise.
+- Large deal TCV is distinct from total TCV / total bookings. If the user asks for large deal TCV, report only the large-deal figure, not total TCV.
 
 Context Usage:
 
