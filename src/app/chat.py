@@ -1,9 +1,10 @@
 from src.agents.graph import run
+from src.features.qa_chain import QAChain
+
+clarifier = QAChain()
 
 print("Financial RAG Chatbot Ready")
 print("Type 'exit' to quit, 'reset' to clear company memory.\n")
-
-memory_companies = []
 
 while True:
     question = input("Ask: ").strip()
@@ -16,12 +17,25 @@ while True:
         continue
 
     if question.lower() == "reset":
-        memory_companies = []
+        clarifier.memory = {
+            "companies": [],
+            "pending_year_clarification": None,
+            "pending_company_clarification": None,
+        }
         print("\nCompany memory cleared.\n")
         continue
 
     try:
-        result = run(question, companies=memory_companies)
+        resolution = clarifier.resolve(question)
+
+        if "question" in resolution:
+            print("\n" + resolution.get("question", "Please try again.") + "\n")
+            continue
+        
+        query = resolution["query"]
+        companies = resolution["companies"]
+
+        result = run(query, companies=companies)
 
         print("\n" + "=" * 60)
         print(result.get("answer", ""))
@@ -47,10 +61,10 @@ while True:
 
         detected_companies = result.get("companies") or []
         if detected_companies:
-            memory_companies = list(detected_companies)
+            clarifier.memory["companies"] = list(detected_companies)
 
-        if memory_companies:
-            print(f"Company memory: {', '.join(memory_companies)}")
+        if clarifier.memory["companies"]:
+            print(f"Company memory: {', '.join(clarifier.memory['companies'])}")
 
         print()
 
