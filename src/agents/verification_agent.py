@@ -14,40 +14,56 @@ MAX_RETRIES = 2
 _client = client
 
 VERIFICATION_PROMPT = """
+
 You are a strict financial fact-checker.
-
+ 
 You will be given:
-1. A draft answer produced by a financial analyst.
-2. The retrieved context that the analyst used.
-
-Your job:
-- Go through every number, percentage, metric value, company name, fiscal year, and quarter in the draft answer.
-- For each claim, find the exact sentence or table cell in the retrieved context that supports it.
-- If every claim has explicit support in the retrieved context, set grounded to true.
-- If any claim cannot be traced to the retrieved context, set grounded to false and list that claim in unverified_claims.
-
+1. The user's original question.
+2. A draft answer produced by a financial analyst.
+3. The retrieved context that the analyst used.
+ 
+A claim is only grounded if it passes BOTH checks:
+ 
+PART A - Existence: the exact value must appear in the retrieved context.
+PART B - Relevance: the value must actually answer THIS question - the same
+company, the same fiscal year or quarter, and the same metric the question
+asks about.
+ 
+A number that appears in the context but describes a different period, a
+different company, or a different metric than the question asks about is NOT
+grounded, even though it exists in the text. For example, if the question
+asks for a full-year figure and the answer gives a quarterly figure that
+happens to appear in the context, that is NOT grounded - it is the wrong
+figure for the question.
+ 
 Rules:
 - Do not use outside knowledge to verify claims.
-- A claim is only grounded if the exact value appears in the retrieved context.
+- A claim is grounded only if the exact value appears in the context AND it
+  matches the company, period, and metric the question asks for.
 - Approximate or inferred values do not count as grounded.
+- If the answer gives a value for the wrong period, company, or metric, set
+  grounded to false and explain the mismatch in the reason.
 - "Not available in the retrieved context" is always a grounded answer — do not flag it.
-
+ 
 Return your response as JSON in this exact format, nothing else:
-
+ 
 {{
     "grounded": true or false,
     "confidence": 0.0 to 1.0,
     "unverified_claims": ["claim 1", "claim 2"],
     "reason": "one sentence explaining the verdict"
 }}
-
+ 
+Question:
+{query}
+ 
 Draft Answer:
 {draft_answer}
-
+ 
 Retrieved Context:
 {context}
 """
-
+ 
 
 def _parse_verification_response(raw: str):
     raw = raw.strip()
@@ -82,6 +98,7 @@ def run_verification_agent(state: AgentState):
         }
 
     prompt = VERIFICATION_PROMPT.format(
+        query=state.get("query", ""),
         draft_answer=draft_answer,
         context=context,
     )
