@@ -37,8 +37,11 @@ comparison_words = [
 
 description_words = [
     "what does",
-    "business",
     "overview",
+    "business overview",
+    "what is the business of",
+    "describe the business",
+    "company profile",
 ]
 
 metric_keywords = [
@@ -57,16 +60,22 @@ metric_keywords = [
     "deal",
     "deals",
     "cash flow",
+    "operating income",
+    "sales",
+    "americas", 
+    "europe", 
+    "united kingdom", 
+    "segment"
 ]
 
 metric_retrieval_map = {
-
-    "headcount": "headcount total employees closing headcount workforce number of employees employee count",
-    "employees": "headcount total employees closing headcount workforce number of employees",
+    "headcount": "headcount total employees closing headcount workforce number of employees employee count permanent employees",
+    "employees": "headcount total employees closing headcount workforce number of employees permanent employees",
     "tcv": "total contract value TCV order book bookings deal value new deals",
     "bookings": "total bookings order book TCV bookings for the quarter deal bookings",
     "cash flow": "free cash flow operating cash flow cash generated from operations",
-    "revenue": "revenue from operations total income turnover sales revenue",
+    "revenue": "consolidated revenue from operations total income turnover sales revenue consolidated statement of profit and loss",
+    "sales": "consolidated revenue from operations total income turnover sales revenue consolidated statement of profit and loss",
     "growth": (
         "revenue growth "
         "YoY growth "
@@ -74,15 +83,20 @@ metric_retrieval_map = {
         "year-on-year growth "
         "quarter-on-quarter growth "
         "constant currency growth "
-        "CC growth "
-        "revenue growth percentage"
+        "CC growth"
     ),
-    "standalone": "standalone statement of profit and loss standalone revenue from operations",
-    "operating income": "operating income operating profit results from operating activities EBIT",
-    "profit": "consolidated profit after tax consolidated PAT profit attributable to equity holders consolidated net profit net income consolidated statement of profit and loss",
+    "standalone": "standalone statement of profit and loss standalone revenue from operations standalone financial statements",
+    "operating income": "operating income operating profit results from operating activities EBIT segment operating income IT services operating income",
+    "profit": "consolidated profit after tax consolidated PAT profit attributable to equity holders consolidated net profit net income consolidated statement of profit and loss attributable to shareholders",
     "ebitda": "consolidated ebitda earnings before interest tax depreciation amortization consolidated operating profit",
     "attrition": "attrition voluntary attrition employee turnover workforce attrition annual attrition rate",
-    "margin": "consolidated margin consolidated operating margin EBITDA margin EBIT margin profit margin consolidated net profit margin",
+    "margin": "consolidated margin consolidated operating margin EBITDA margin EBIT margin profit margin consolidated net profit margin IT services operating margin",
+    "guidance": "revenue guidance growth guidance FY guidance constant currency guidance management guidance outlook",
+    "deal": "deal wins total contract value TCV large deals mega deals order bookings new contracts won",
+    "deals": "deal wins total contract value TCV large deals mega deals order bookings new contracts won",
+    "americas": "Americas geographic segment revenue United States Canada geographic breakdown",
+    "europe": "Europe geographic segment revenue United Kingdom Continental Europe geographic breakdown",
+    "segment": "segment revenue geographic segment vertical segment revenue breakdown",
 }
 
 NARRATIVE_TOPICS = {
@@ -114,11 +128,11 @@ NARRATIVE_TOPICS = {
 }
 
 topic_retrieval_map = {
+    "ai": "AI services artificial intelligence AI revenue annualized AI generative AI GenAI",
     "guidance": "management guidance growth forecast outlook business projections management commentary forward looking expectations",
     "outlook": "business outlook demand environment growth trajectory macroeconomic commentary executive outlook",
     "deal wins": "deal wins total contract value TCV large deals mega deals order bookings new contracts won",
 }
-
 
 quarter_patterns = {
     "Q1": [r"\bq1\b", r"\bq\s*1\b", r"\bquarter\s*1\b", r"\bfirst quarter\b"],
@@ -156,7 +170,32 @@ available_fiscal_years = [
     "FY24",
 ]
 
-FINANCIAL_METRICS = {"revenue", "profit", "ebitda", "margin", "growth"}
+FINANCIAL_METRICS = {"revenue", "profit", "ebitda", "margin", "growth", "sales"}
+
+
+def _fill_year_range(years):
+
+    if len(years) < 2:
+        return years
+
+    def fy_to_int(fy):
+        m = re.search(r"(\d{2,4})$", str(fy))
+        if not m:
+            return -1
+        v = m.group(1)
+        return int(v[-2:])
+
+    year_ints = [fy_to_int(y) for y in years]
+    min_yr = min(year_ints)
+    max_yr = max(year_ints)
+
+    filled = []
+    for fy in available_fiscal_years:
+        n = fy_to_int(fy)
+        if min_yr <= n <= max_yr:
+            filled.append(fy)
+
+    return filled if filled else years
 
 
 class QueryDecomposer:
@@ -171,11 +210,28 @@ class QueryDecomposer:
         topics = self._find_topics(query_lower)
 
         is_comparison = (
-            any(word in query_lower for word in comparison_words) or len(companies) > 1
+            any(word in query_lower for word in comparison_words)
+            or len(companies) > 1
         )
-        is_description = any(word in query_lower for word in description_words)
+
+        is_description = (
+            any(word in query_lower for word in description_words)
+            and not metrics
+        )
+   
 
         explicit_years = self._extract_explicit_fiscal_years(query_lower)
+
+        is_range_query = bool(
+            re.search(r"\bfy\d{2,4}\b.*\bto\b.*\bfy\d{2,4}\b", query_lower)
+            or re.search(r"\bfrom\b.*\bfy\d{2,4}\b.*\bto\b.*\bfy\d{2,4}\b", query_lower)
+            or "change" in query_lower
+            or "trend" in query_lower
+            or "over" in query_lower
+        )
+        if is_range_query and len(explicit_years) >= 2:
+            explicit_years = _fill_year_range(explicit_years)
+
         requested_years = self._get_requested_temporal_years(
             query_lower, explicit_years
         )
@@ -213,6 +269,8 @@ class QueryDecomposer:
                 company_text = company_retrieval_map.get(company, company)
                 for metric in merged_metrics:
                     metric_text = metric_retrieval_map.get(metric, metric)
+                    if "standalone" in query_lower:
+                        metric_text = metric_retrieval_map["standalone"] + " " + metric_text
                     for time in time_suffixes:
                         subqueries.append(
                             f"{company_text} {metric_text} {time}".strip()
@@ -223,7 +281,9 @@ class QueryDecomposer:
                 company_text = company_retrieval_map.get(company, company)
                 metric_text = metric_retrieval_map["revenue"]
                 for time in time_suffixes:
-                    subqueries.append(f"{company_text} {metric_text} {time}".strip())
+                    subqueries.append(
+                        f"{company_text} {metric_text} {time}".strip()
+                    )
             statement_type_filter = "consolidated"
 
         elif len(companies) > 1 and is_description:
@@ -237,7 +297,6 @@ class QueryDecomposer:
             company = companies[0]
             company_text = company_retrieval_map.get(company, company)
 
-
             if metrics:
                 merged_metrics = list(metrics)
                 if "revenue" in merged_metrics and "growth" in merged_metrics:
@@ -245,8 +304,8 @@ class QueryDecomposer:
 
                 for metric in merged_metrics:
                     metric_text = metric_retrieval_map.get(metric, metric)
-                    if "standalone" in query_lower:                                    
-                        metric_text = metric_retrieval_map["standalone"] + " " + metric_text   
+                    if "standalone" in query_lower:
+                        metric_text = metric_retrieval_map["standalone"] + " " + metric_text
                     for time in time_suffixes:
                         subqueries.append(
                             f"{company_text} {metric_text} {time}".strip()
@@ -256,7 +315,9 @@ class QueryDecomposer:
                 for topic in topics:
                     topic_text = topic_retrieval_map.get(topic, topic)
                     for time in time_suffixes:
-                        subqueries.append(f"{company_text} {topic_text} {time}".strip())
+                        subqueries.append(
+                            f"{company_text} {topic_text} {time}".strip()
+                        )
 
             elif is_description:
                 subqueries.append(
@@ -264,15 +325,13 @@ class QueryDecomposer:
                 )
 
             else:
-                fallback_intents = ["revenue", "guidance", "deal wins"]
-                for intent in fallback_intents:
-                    intent_text = metric_retrieval_map.get(
-                        intent
-                    ) or topic_retrieval_map.get(intent, intent)
-                    for time in time_suffixes:
-                        subqueries.append(
-                            f"{company_text} {intent_text} {time}".strip()
-                        )
+                cleaned = re.sub(
+                    r"^(what|how|why|who|when|did|does|which|were|tell me|can you|please)\s+",
+                    "",
+                    query,
+                    flags=re.IGNORECASE,
+                ).strip()
+                subqueries.append(f"{company_text} {cleaned}")
 
         if not subqueries:
             subqueries = [query.strip()]
@@ -328,7 +387,6 @@ class QueryDecomposer:
         for year in fiscal_matches:
             years.append(f"FY{year[-2:]}")
 
-
         normalized = []
         for year in years:
             year = year.upper()
@@ -345,7 +403,6 @@ class QueryDecomposer:
 
         if "last 3 years" in query_lower or "past 3 years" in query_lower:
             return available_fiscal_years[:3]
-        
 
         is_temporal = any(word in query_lower for word in temporal_words)
         if is_temporal:

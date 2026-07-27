@@ -71,16 +71,17 @@
     "note": "consolidated, attributable to shareholders",
     "answerable": true
   },
+  
   {
     "id": "tcs_007",
     "company": "tcs",
     "category": "single_year_fact",
-    "question": "What was TCS profit for the year attributable to shareholders in FY26?",
+    "question": "What was TCS profit after tax attributable to shareholders in FY26, excluding exceptional items?",
     "expected_answer": "52820",
     "expected_unit": "INR crore",
     "expected_source": "tcs_fy26_annual_report",
     "expected_page": 36,
-    "note": "consolidated, attributable to shareholders, excluding exceptional items",
+    "note": "consolidated, attributable to shareholders, EXCLUDING exceptional items (52,820 in the MD&A performance table); distinct from the P&L 'profit for the year attributable to shareholders' of 49,210 which is after the exceptional item",
     "answerable": true
   },
   {
@@ -347,11 +348,11 @@
     "company": "wipro",
     "category": "single_fact",
     "question": "What was Wipro's consolidated net profit in FY26?",
-    "expected_answer": "132655",
+    "expected_answer": "131974",
     "expected_unit": "INR million",
     "expected_source": "wipro_fy26_annual_report",
     "expected_page": 96,
-    "note": "consolidated, total company (not IT Services segment). Verified: 132655/132180 = +0.36% as stated",
+    "note": "consolidated, profit attributable to equity holders of the Company (131,974); NOT total profit for the year of 132,655 which includes 681 non-controlling interests",
     "answerable": true
   },
   {
