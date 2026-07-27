@@ -218,40 +218,53 @@ class Retriever:
             "documents": fused_docs,
             "metadata": fused_metadata,
         }
-
     def search(self, query, n_results, filters=None):
-        result = self._search_once(query=query, n_results=n_results, filters=filters)
+        result = self._search_once(
+            query=query,
+            n_results=n_results,
+            filters=filters,
+        )
 
         if result["documents"]:
             return result
 
-        if filters and (filters.get("basis") or filters.get("figure_type")):
-            relaxed_basis_filters = dict(filters)
-            relaxed_basis_filters.pop("basis", None)
-            relaxed_basis_filters.pop("figure_type", None)
+        if not filters:
+            return result
 
-            relaxed_basis_result = self._search_once(
+        relax_steps = [
+            ["basis", "figure_type"],
+            ["statement_type"],
+            ["quarters"],
+            ["doc_types"],
+            ["source_kinds"],
+
+        ]
+
+        current_filters = dict(filters)
+
+        for keys in relax_steps:
+
+            changed = False
+
+            for key in keys:
+                if key in current_filters:
+                    current_filters.pop(key)
+                    changed = True
+
+            if not changed:
+                continue
+
+            relaxed = self._search_once(
                 query=query,
                 n_results=n_results,
-                filters=relaxed_basis_filters,
+                filters=current_filters,
             )
 
-            if relaxed_basis_result["documents"]:
-                return relaxed_basis_result
+            if relaxed["documents"]:
+                return relaxed
 
-            filters = relaxed_basis_filters
-
-        if filters and filters.get("statement_type"):
-            relaxed_filters = dict(filters)
-            relaxed_filters.pop("statement_type", None)
-
-            relaxed_result = self._search_once(
-                query=query,
-                n_results=n_results,
-                filters=relaxed_filters,
-            )
-
-            if relaxed_result["documents"]:
-                return relaxed_result
-
-        return result
+        return self._search_once(
+            query=query,
+            n_results=n_results,
+            filters=None,
+        )
