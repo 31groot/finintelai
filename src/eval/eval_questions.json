@@ -96,7 +96,7 @@
     "answerable": true
   },
   {
-    "id": "tcs_010",
+    "id": "tcs_009",
     "company": "tcs",
     "category": "quarterly",
     "question": "What was TCS closing headcount at the end of Q2 FY26?",
@@ -108,7 +108,7 @@
     "answerable": true
   },
   {
-    "id": "tcs_011",
+    "id": "tcs_010",
     "company": "tcs",
     "category": "quarterly",
     "question": "What was TCS order book TCV in Q3 FY26?",
@@ -120,7 +120,7 @@
     "answerable": true
   },
   {
-    "id": "tcs_012",
+    "id": "tcs_011",
     "company": "tcs",
     "category": "quarterly",
     "question": "What was TCS operating margin in Q4 FY26?",
@@ -132,7 +132,7 @@
     "answerable": true
   },
   {
-    "id": "tcs_013",
+    "id": "tcs_012",
     "company": "tcs",
     "category": "narrative",
     "question": "On the Q4 FY26 earnings call, what annualized figure did TCS give for its AI Services business?",
@@ -144,7 +144,7 @@
     "answerable": true
   },
   {
-    "id": "tcs_014",
+    "id": "tcs_013",
     "company": "tcs",
     "category": "constant_currency",
     "question": "By what percentage did TCS FY26 revenue decline in constant currency?",
@@ -153,6 +153,19 @@
     "expected_source": "tcs_fy26_q4_earnings_call",
     "expected_page": 5,
     "note": "constant currency, full-year FY26. Decline: unsigned number given",
+    "answerable": true
+  },
+  {
+    "id": "tcs_014",
+    "company": "tcs",
+    "category": "table_sourced",
+    "question": "What was TCS revenue from the United Kingdom geographic segment in FY26?",
+    "expected_answer": "46444",
+    "expected_unit": "INR crore",
+    "expected_source": "tcs_fy26_annual_report",
+    "expected_page": 69,
+    "quote": "United Kingdom\n46,444\n42,977\n39,852\n33,861\n30,399\n25,659\n24,899\n22,862\n17,625\n16,404",
+    "note": "geographic segment row of the ten-year Performance Trend table, whose headers run 'FY 2026 / FY 2025 / FY 2024 ...'; FY26 is the first column = 46,444. The FY26 report splits Europe into United Kingdom and Continental Europe",
     "answerable": true
   },
 
@@ -229,7 +242,7 @@
     "answerable": true
   },
   {
-    "id": "infosys_009",
+    "id": "infosys_007",
     "company": "infosys",
     "category": "quarterly",
     "question": "What was Infosys large deal TCV in Q1 FY26?",
@@ -241,7 +254,7 @@
     "answerable": true
   },
   {
-    "id": "infosys_010",
+    "id": "infosys_008",
     "company": "infosys",
     "category": "quarterly",
     "question": "What was Infosys operating margin in Q2 FY26?",
@@ -253,7 +266,7 @@
     "answerable": true
   },
   {
-    "id": "infosys_011",
+    "id": "infosys_009",
     "company": "infosys",
     "category": "quarterly",
     "question": "What was Infosys reported operating margin in Q3 FY26?",
@@ -265,7 +278,7 @@
     "answerable": true
   },
   {
-    "id": "infosys_012",
+    "id": "infosys_010",
     "company": "infosys",
     "category": "narrative",
     "question": "On the Q4 FY26 earnings call, by what percentage did Infosys say full-year large deals were higher than the previous year?",
@@ -277,7 +290,7 @@
     "answerable": true
   },
   {
-    "id": "infosys_013",
+    "id": "infosys_011",
     "company": "infosys",
     "category": "constant_currency",
     "question": "What was Infosys full-year FY26 revenue growth in constant currency terms?",
@@ -289,7 +302,7 @@
     "answerable": true
   },
   {
-    "id": "infosys_014",
+    "id": "infosys_012",
     "company": "infosys",
     "category": "guidance",
     "question": "What revenue growth guidance did Infosys give for FY26 on the Q3 FY26 earnings call?",
@@ -300,6 +313,32 @@
     "expected_source": "infosys_fy26_q3_earnings_call",
     "expected_page": 3,
     "note": "revised FY26 guidance issued at Q3; constant currency. Earlier guidance was 1-3% (Q1) and 2-3% (Q2)",
+    "answerable": true
+  },
+  {
+    "id": "infosys_013",
+    "company": "infosys",
+    "category": "table_sourced",
+    "question": "What was the constant currency year-on-year revenue growth for Infosys' Financial Services segment in Q2 FY26?",
+    "expected_answer": "5.4",
+    "expected_unit": "percent",
+    "expected_source": "infosys_fy26_q2_investor_presentation",
+    "expected_page": 1,
+    "quote": "Financial services\n27.7\n27.9\n27.2\n5.6\n5.4",
+    "note": "constant currency. Revenues by Business Segments table with headers 'Sep 30, 2025 / Jun 30, 2025 / Sep 30, 2024 / Reported / CC'. The first three values are revenue-mix percentages; the CC YoY growth is the last (5th) column = 5.4, and the Reported YoY column is 5.6",
+    "answerable": true
+  },
+  {
+    "id": "infosys_014",
+    "company": "infosys",
+    "category": "table_sourced",
+    "question": "What was the reported year-on-year revenue growth for Infosys' Communication segment in Q3 FY26?",
+    "expected_answer": "11.6",
+    "expected_unit": "percent",
+    "expected_source": "infosys_fy26_q3_investor_presentation",
+    "expected_page": 1,
+    "quote": "Communication\n12.1\n12.1\n11.2\n11.6\n9.9",
+    "note": "Revenues by Business Segments table with headers 'Dec 31, 2025 / Sep 30, 2025 / Dec 31, 2024 / Reported / CC'. The first three values are revenue-mix percentages; the Reported YoY column is the 4th value = 11.6, and the CC YoY column is 9.9",
     "answerable": true
   },
 
@@ -466,7 +505,7 @@
     "question": "What sequential revenue growth guidance did Wipro give for the quarter ending June 30, 2026?",
     "expected_answer": "-2.0% to 0.0%",
     "answer_type": "range",
-    "range_endpoints": ["2.0", "0.0"],
+    "range_endpoints": ["-2.0", "0.0"],
     "expected_unit": "percent, QoQ constant currency",
     "expected_source": "wipro_fy26_q4_investor_presentation",
     "expected_page": 15,
