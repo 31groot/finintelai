@@ -27,7 +27,10 @@ def normalize_number(text):
     text = str(text).lower()
     text = re.sub(r"[,\s₹$`%]", "", text)
     text = text.strip()
-    text = re.sub(r"\.$", "", text)  
+    if re.fullmatch(r"-?\d+\.\d+", text):
+        text = text.rstrip("0").rstrip(".")   
+    else:
+        text = re.sub(r"\.$", "", text)
     return text
 
 
@@ -37,8 +40,9 @@ def said_not_available(answer):
 
 
 def extract_numbers(answer):
-    """Every number-like token in the answer, normalized."""
-    raw = re.findall(r"[-+]?\d[\d,]*\.?\d*", answer or "")
+    text = (answer or "").replace("−", "-").replace("–", "-").replace("—", "-")
+    text = re.sub(r"\((\d[\d,]*\.?\d*)\)", r"-\1", text)
+    raw = re.findall(r"-?\d[\d,]*\.?\d*", text)
     return {normalize_number(r) for r in raw}
 
 

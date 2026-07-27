@@ -43,13 +43,25 @@ quarter_patterns = {
 
 commentary_keywords = [
     "management",
+    "management commentary",
+    "prepared remarks",
+    "opening remarks",
     "commentary",
-    "said",
-    "saying",
-    "call transcript",
-    "transcript",
     "conference call",
     "earnings call",
+    "earnings conference call",
+    "call transcript",
+    "transcript",
+    "operator",
+    "question-and-answer",
+    "q&a",
+    "analyst",
+    "ceo",
+    "cfo",
+    "said",
+    "saying",
+    "mentioned",
+    "stated",
 ]
 
 metric_keywords_local = [
@@ -74,19 +86,36 @@ metric_keywords_local = [
     "ebitda",
 ]
 
-constant_currency_query_terms = [
+CONSTANT_CURRENCY_MARKERS = [
     "constant currency",
     "constant-currency",
-    "cc terms",
+    "constant currency growth",
+    "growth in constant currency",
+    "decline in constant currency",
+    "revenue decline in constant currency",
+    "revenue growth in constant currency",
+    "constant currency revenue growth",
+    "constant currency revenue decline",
     "cc growth",
-    "in cc",
+    "cc terms",
+    "in cc terms",
+    "on a cc basis",
+    "cc basis",
+    "constant currency basis",
+    "sequential cc growth",
+    "year-on-year cc growth",
+    "yoy cc growth",
 ]
 
 reported_basis_query_terms = [
-    "reported basis",
-    "reported terms",
-    "as reported",
-    "in reported",
+    "decline in constant currency",
+    "increment in constant currency",
+    "constant currency",
+    "constant-currency",
+    "in cc terms",
+    "cc growth",
+    "cc terms",
+    "on a cc basis",
 ]
 
 guidance_query_terms = [
@@ -198,7 +227,7 @@ class RAGPipeline:
 
         q = query.lower()
 
-        if any(term in q for term in constant_currency_query_terms):
+        if any(term in q for term in CONSTANT_CURRENCY_MARKERS):
             return "constant_currency"
 
         if any(term in q for term in reported_basis_query_terms):

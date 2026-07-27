@@ -1,6 +1,6 @@
 from pathlib import Path
 import re
-
+from src.features.rag import CONSTANT_CURRENCY_MARKERS 
 from src.ingestion.pdf_loader import load_pdf_pages
 from src.ingestion.chunker import chunk_text
 from src.ingestion.table_parser import extract_tables
@@ -37,14 +37,6 @@ doc_type_patterns = {
     ],
 }
 
-CONSTANT_CURRENCY_MARKERS = [
-    "constant currency",
-    "constant-currency",
-    "in cc terms",
-    "cc growth",
-    "cc terms",
-    "on a cc basis",
-]
 
 REPORTED_BASIS_MARKERS = [
     "reported basis",
