@@ -263,7 +263,7 @@ class QueryDecomposer:
             merged_metrics = list(metrics)
             if "revenue" in merged_metrics and "growth" in merged_metrics:
                 merged_metrics.remove("revenue")
-
+                
             for company in companies:
                 company_text = company_retrieval_map.get(company, company)
                 for metric in merged_metrics:
