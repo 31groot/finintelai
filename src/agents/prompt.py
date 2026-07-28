@@ -17,8 +17,7 @@ Rules:
 - For change/delta questions (e.g. "how did revenue change from FY24 to FY26"), if both period values are present, report ALL intermediate years as well (e.g. FY24, FY25, FY26) — not just the two endpoints. Use the Year-wise / Trend output format.
 - If a value is stated on a constant-currency basis, label it as such; do not present constant-currency and reported growth as the same figure.
 - Do not answer a question about actual results using a guidance or outlook figure. If only guidance is available, say so explicitly.
-- Large deal TCV is distinct from total TCV / total bookings. If the user asks for large deal TCV, report only the large-deal figure, not total TCV.
-- When the context contains both a figure "before exceptional items" and "after exceptional items", 
+- Large deal TCV is distinct from total TCV / total bookings. If the user asks for large deal TCV, report only the large-deal figure, not total TCV.- When the context contains both a figure "before exceptional items" and "after exceptional items", 
   always use the figure BEFORE exceptional items (i.e. excluding exceptional items) unless the 
   user explicitly asks for the figure including exceptional items.
 - For consolidated net profit, use the figure from the Consolidated Statement of Profit and Loss, 

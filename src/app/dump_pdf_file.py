@@ -14,6 +14,7 @@ FINANCIAL_KEYWORDS = [
     "headcount",
     "employees",
     "tcv",
+
     "profit",
     "ebit",
     "growth",
