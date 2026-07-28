@@ -218,7 +218,6 @@ class QueryDecomposer:
             any(word in query_lower for word in description_words)
             and not metrics
         )
-   
 
         explicit_years = self._extract_explicit_fiscal_years(query_lower)
 
@@ -271,6 +270,8 @@ class QueryDecomposer:
                     metric_text = metric_retrieval_map.get(metric, metric)
                     if "standalone" in query_lower:
                         metric_text = metric_retrieval_map["standalone"] + " " + metric_text
+                    if "constant currency" in query_lower or "constant-currency" in query_lower:
+                        metric_text = "constant currency growth CC revenue growth reported growth " + metric_text
                     for time in time_suffixes:
                         subqueries.append(
                             f"{company_text} {metric_text} {time}".strip()
@@ -306,6 +307,8 @@ class QueryDecomposer:
                     metric_text = metric_retrieval_map.get(metric, metric)
                     if "standalone" in query_lower:
                         metric_text = metric_retrieval_map["standalone"] + " " + metric_text
+                    if "constant currency" in query_lower or "constant-currency" in query_lower:
+                        metric_text = "constant currency growth CC revenue growth reported growth " + metric_text
                     for time in time_suffixes:
                         subqueries.append(
                             f"{company_text} {metric_text} {time}".strip()
