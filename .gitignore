@@ -1,12 +1,8 @@
 .env
 .venv/
-data/chromadb/
-
-src/app/test_gemini.py.env
 data/raw/*.pdf
 __pycache__/
 *.pyc
 *.pyo
-
-data/extracted/
 eval/results/
+data/raw/

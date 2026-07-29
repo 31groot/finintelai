@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from src.llm.client import client
 
 from src.agents.state import AgentState
+from src.llm.usage import record_usage
 
 load_dotenv()
 
@@ -110,6 +111,12 @@ def run_verification_agent(state: AgentState):
                 model=os.getenv("AZURE_OPENAI_DEPLOYMENT"),
                 input=prompt,
             )
+            u = getattr(response, "usage", None)
+            if u is not None:
+                record_usage(getattr(u, "input_tokens", 0), getattr(u, "output_tokens", 0))
+
+
+
             verification = _parse_verification_response(response.output_text)
             break
         except Exception as e:
