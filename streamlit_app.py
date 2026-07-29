@@ -1,5 +1,6 @@
 import streamlit as st
 import os
+import time
 
 # Bridge Streamlit secrets -> environment variables so the pipeline's
 # os.getenv(...) calls find them. Must run BEFORE importing the pipeline.
