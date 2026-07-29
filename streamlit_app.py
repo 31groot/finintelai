@@ -79,11 +79,14 @@ if prompt:
             resolved_query = resolution["query"]
             companies = resolution.get("companies", [])
 
+            from src.llm.usage import reset_usage, get_usage
+
             with st.spinner("Searching filings and verifying..."):
+                reset_usage()                    
                 start = time.perf_counter()
                 result = run(resolved_query, companies=companies)
                 latency_ms = (time.perf_counter() - start) * 1000
-
+                usage = get_usage()             
             answer = result.get("answer", "")
             st.markdown(answer)
 
@@ -95,11 +98,18 @@ if prompt:
             grounded = verification.get("grounded")
             confidence = verification.get("confidence")
 
-            cols = st.columns(3)
+            cols = st.columns(4)
             if confidence is not None:
                 cols[0].metric("Confidence", f"{confidence*100:.0f}%")
             cols[1].metric("Grounded", "Yes" if grounded else "No")
             cols[2].metric("Latency", f"{latency_ms/1000:.1f}s")
+            cols[3].metric("Cost", f"${usage.cost_usd:.4f}")
+
+            st.caption(
+                f"{usage.total_tokens:,} tokens "
+                f"({usage.input_tokens:,} in / {usage.output_tokens:,} out) "
+                f"across {usage.calls} LLM calls"
+            )
 
             sources = _dedupe_sources(result.get("metadata"))
             if sources:
