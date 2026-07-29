@@ -53,6 +53,21 @@ class QAChain:
         "fiscal 2024",
     ]
 
+
+     superlative_words = [        
+        "highest", 
+        "lowest", 
+        "best", 
+        "worst", 
+        "most", 
+        "least",
+        "which company", 
+        "top", 
+        "leader", 
+        "leading",
+    ]
+
+
     def __init__(self):
         self.rag = get_pipeline()        
         self.memory = {
@@ -113,6 +128,10 @@ class QAChain:
         is_description = any(word in query_lower for word in self.description_words)
         is_comparison = any(word in query_lower for word in self.comparison_words)
         is_temporal = any(word in query_lower for word in self.temporal_words)
+        is_superlative = any(w in query_lower for w in self.superlative_words)
+
+        if is_superlative:
+            return False
 
         if companies:
             return False

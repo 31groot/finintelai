@@ -170,7 +170,20 @@ available_fiscal_years = [
     "FY24",
 ]
 
-FINANCIAL_METRICS = {"revenue", "profit", "ebitda", "margin", "growth", "sales"}
+FINANCIAL_METRICS = ["revenue", "profit", "ebitda", "margin", "growth", "sales"]
+
+superlative_words = [
+    "highest", 
+    "lowest", 
+    "best", 
+    "worst", 
+    "most",
+    "least", 
+    "which company", 
+    "top", 
+    "leader", 
+    "leading"
+    ]
 
 
 def _fill_year_range(years):
@@ -214,6 +227,10 @@ class QueryDecomposer:
             or len(companies) > 1
         )
 
+        is_superlative = any(w in query_lower for w in superlative_words)
+        if is_superlative and not companies:
+            companies = list(company_aliases.keys())
+
         is_description = (
             any(word in query_lower for word in description_words)
             and not metrics
@@ -236,7 +253,7 @@ class QueryDecomposer:
         )
         requested_quarters = self._extract_quarters(query_lower)
 
-        needs_consolidated = bool(set(metrics) & FINANCIAL_METRICS)
+        needs_consolidated = bool(set(metrics) & set(FINANCIAL_METRICS))
 
         if "standalone" in query_lower:
             statement_type_filter = "standalone"
