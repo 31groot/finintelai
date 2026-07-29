@@ -3,12 +3,15 @@ import os
 
 # Bridge Streamlit secrets -> environment variables so the pipeline's
 # os.getenv(...) calls find them. Must run BEFORE importing the pipeline.
-for key in ["AZURE_OPENAI_API_KEY", "AZURE_OPENAI_ENDPOINT",
-            "AZURE_OPENAI_API_VERSION", "AZURE_OPENAI_DEPLOYMENT"]:
-    if key in st.secrets:
-        os.environ[key] = st.secrets[key]
-st.set_page_config(page_title="FinIntel AI", layout="centered")
+try:
+    for key in ["AZURE_OPENAI_API_KEY", "AZURE_OPENAI_ENDPOINT",
+                "AZURE_OPENAI_API_VERSION", "AZURE_OPENAI_DEPLOYMENT"]:
+        if key in st.secrets:
+            os.environ[key] = st.secrets[key]
+except Exception:
+    pass  
 
+st.set_page_config(page_title="FinIntel AI", layout="centered")
 
 @st.cache_resource(show_spinner="Loading models and index (first load ~1 min)...")
 def load_pipeline():
