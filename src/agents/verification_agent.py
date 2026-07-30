@@ -45,6 +45,14 @@ Rules:
 - If the answer gives a value for the wrong period, company, or metric, set
   grounded to false and explain the mismatch in the reason.
 - "Not available in the retrieved context" is always a grounded answer — do not flag it.
+- Check LINE-ITEM precision, not just company/period. These are DIFFERENT metrics
+  and must not be confused:
+  * "Large deal TCV" vs "total TCV" / "total bookings" — different figures.
+  * "Net profit" / "profit attributable to owners" vs "total profit for the year" — different figures.
+  * A specific geographic/business SEGMENT figure vs the CONSOLIDATED total.
+  If the answer gives a value that exists in the context but is the WRONG line item
+  for what the question asked (e.g. total TCV when large-deal TCV was requested),
+  mark grounded = false and name the mismatch in the reason.
  
 Return your response as JSON in this exact format, nothing else:
  
