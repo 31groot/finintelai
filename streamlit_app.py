@@ -14,6 +14,15 @@ except Exception:
 
 st.set_page_config(page_title="FinIntel AI", layout="centered")
 
+with st.sidebar:
+    st.markdown("### FinIntel AI")
+    if st.button("🗑️ Clear conversation"):
+        st.session_state.messages = []
+        clarifier.memory["companies"] = []
+        clarifier.memory["pending_year_clarification"] = None
+        clarifier.memory["pending_company_clarification"] = None
+        st.rerun()
+
 @st.cache_resource(show_spinner="Loading models and index (first load ~1 min)...")
 def load_pipeline():
     from src.agents.graph import run
