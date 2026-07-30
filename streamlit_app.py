@@ -123,5 +123,5 @@ if prompt:
 st.divider()
 st.caption(
     "Demo project — retrieval-augmented generation with a verification agent and "
-    "a 52-question evaluation harness (87% accuracy). Scoped to 3 companies / 3 years."
+    "a 52-question evaluation harness (89% accuracy). Scoped to 3 companies / 3 years."
 )
