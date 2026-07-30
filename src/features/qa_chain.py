@@ -5,68 +5,66 @@ from src.retrieval.query_decomposer import company_aliases
 load_dotenv()
 
 
+comparison_words = [
+    "compare",
+    "comparison",
+    "rank",
+    "ranking",
+    "highest",
+    "lowest",
+    "best",
+    "worst",
+    "better",
+    "versus",
+    "vs",
+]
+
+description_words = [
+    "what does",
+    "what does company",
+    "business",
+    "overview",
+]
+
+temporal_words = [
+    "growth",
+    "by year",
+    "year wise",
+    "year-wise",
+    "over the year",
+    "across years",
+    "last 2 years",
+    "last 3 years",
+    "last 5 years",
+    "past 2 years",
+    "past 3 years",
+    "trend",
+    "historical",
+    "history",
+    "over time",
+    "yearly",
+    "fy26",
+    "fy25",
+    "fy24",
+    "fiscal 2026",
+    "fiscal 2025",
+    "fiscal 2024",
+]
+
+superlative_words = [
+    "highest", 
+    "lowest", 
+    "best", 
+    "worst", 
+    "most", 
+    "least",
+    "which company",
+    "top", 
+    "leader", 
+    "leading",
+]
+
 class QAChain:
-
-    comparison_words = [
-        "compare",
-        "comparison",
-        "rank",
-        "ranking",
-        "highest",
-        "lowest",
-        "best",
-        "worst",
-        "better",
-        "versus",
-        "vs",
-    ]
-
-    description_words = [
-        "what does",
-        "what does company do",
-        "business",
-        "overview",
-    ]
-
-    temporal_words = [
-        "growth",
-        "by year",
-        "year wise",
-        "year-wise",
-        "over the years",
-        "across years",
-        "last 2 years",
-        "last 3 years",
-        "last 5 years",
-        "past 2 years",
-        "past 3 years",
-        "trend",
-        "historical",
-        "history",
-        "over time",
-        "yearly",
-        "fy26",
-        "fy25",
-        "fy24",
-        "fiscal 2026",
-        "fiscal 2025",
-        "fiscal 2024",
-    ]
-
-
-    superlative_words = [        
-        "highest", 
-        "lowest", 
-        "best", 
-        "worst", 
-        "most", 
-        "least",
-        "which company", 
-        "top", 
-        "leader", 
-        "leading",
-    ]
-
 
     def __init__(self):
         self.rag = get_pipeline()        
@@ -125,10 +123,10 @@ class QAChain:
 
         has_memory = bool(self.memory["companies"])
 
-        is_description = any(word in query_lower for word in self.description_words)
-        is_comparison = any(word in query_lower for word in self.comparison_words)
-        is_temporal = any(word in query_lower for word in self.temporal_words)
-        is_superlative = any(w in query_lower for w in self.superlative_words)
+        is_description = any(word in query_lower for word in description_words)
+        is_comparison = any(word in query_lower for word in comparison_words)
+        is_temporal = any(word in query_lower for word in temporal_words)
+        is_superlative = any(w in query_lower for w in superlative_words)
 
         if is_superlative:
             return False
@@ -151,8 +149,8 @@ class QAChain:
         metrics = self.rag.decomposer._find_metrics(query_lower)
 
         explicit_year = self._extract_fiscal_year(query)
-        is_comparison = any(word in query_lower for word in self.comparison_words)
-        is_temporal = any(word in query_lower for word in self.temporal_words)
+        is_comparison = any(word in query_lower for word in comparison_words)
+        is_temporal = any(word in query_lower for word in temporal_words)
 
         if explicit_year or is_temporal:
             return False
@@ -278,7 +276,7 @@ class QAChain:
             }
 
             return {
-                "question": f"Which fiscal year should I compare — {valid_text}?",
+                "question": f"Which fiscal year should I compare - {valid_text}?",
             }
 
         self._update_memory(query)
