@@ -54,7 +54,7 @@ class QAChain:
     ]
 
 
-     superlative_words = [        
+    superlative_words = [        
         "highest", 
         "lowest", 
         "best", 
