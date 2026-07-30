@@ -372,6 +372,16 @@ def main(reset=False):
     store.add_documents(all_chunks, embeddings, all_metadata)
     print(f"Total documents in DB: {store.count()}")
 
-
 if __name__ == "__main__":
-    main(reset=True)
+    import argparse
+
+    parser = argparse.ArgumentParser(description="FinIntel AI ingestion pipeline")
+    parser.add_argument(
+        "--reset",
+        action="store_true",
+        help="Wipe and rebuild the vector store from scratch. "
+             "Without this flag, ingestion respects the existing store.",
+    )
+    args = parser.parse_args()
+
+    main(reset=args.reset)
